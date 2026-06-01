@@ -122,10 +122,10 @@ echo -e "  Telemetry:     ${BLUE}$ENABLE_TELEMETRY${NC}"
 echo -e "  Registry:      ${BLUE}$REGISTRY${NC}"
 echo ""
 
-# Download compose file (skip when DOGRAH_SKIP_DOWNLOAD=1 — e.g. local repo testing).
+# Download compose file (skip when SCAIVA_SKIP_DOWNLOAD=1 — e.g. local repo testing).
 TOTAL_STEPS=2
 
-if [[ "${DOGRAH_SKIP_DOWNLOAD:-}" != "1" ]]; then
+if [[ "${SCAIVA_SKIP_DOWNLOAD:-}" != "1" ]]; then
     if [[ "${ENABLE_COTURN:-false}" == "true" ]]; then
         echo -e "${BLUE}[1/$TOTAL_STEPS] Downloading docker-compose.yaml and TURN helper bundle...${NC}"
     else
@@ -133,7 +133,7 @@ if [[ "${DOGRAH_SKIP_DOWNLOAD:-}" != "1" ]]; then
     fi
     curl -sS -o docker-compose.yaml https://raw.githubusercontent.com/dograh-hq/dograh/main/docker-compose.yaml
     if [[ "${ENABLE_COTURN:-false}" == "true" ]]; then
-        dograh_download_init_support_bundle "$(pwd)" "main"
+        scaiva_download_init_support_bundle "$(pwd)" "main"
     fi
     echo -e "${GREEN}✓ Deployment files downloaded${NC}"
 else
@@ -141,9 +141,9 @@ else
 fi
 
 if [[ "${ENABLE_COTURN:-false}" == "true" ]]; then
-    [[ -f scripts/run_dograh_init.sh ]] || dograh_fail "scripts/run_dograh_init.sh not found. Re-run setup_local.sh without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout."
-    [[ -f scripts/lib/setup_common.sh ]] || dograh_fail "scripts/lib/setup_common.sh not found. Re-run setup_local.sh without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout."
-    [[ -f deploy/templates/turnserver.remote.conf.template ]] || dograh_fail "deploy/templates/turnserver.remote.conf.template not found. Re-run setup_local.sh without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout."
+    [[ -f scripts/run_scaiva_init.sh ]] || scaiva_fail "scripts/run_scaiva_init.sh not found. Re-run setup_local.sh without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout."
+    [[ -f scripts/lib/setup_common.sh ]] || scaiva_fail "scripts/lib/setup_common.sh not found. Re-run setup_local.sh without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout."
+    [[ -f deploy/templates/turnserver.remote.conf.template ]] || scaiva_fail "deploy/templates/turnserver.remote.conf.template not found. Re-run setup_local.sh without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout."
 fi
 
 # Generate .env
@@ -184,7 +184,7 @@ echo -e "Files created in ${BLUE}$(pwd)${NC}:"
 echo "  - docker-compose.yaml"
 echo "  - .env"
 if [[ "${ENABLE_COTURN:-false}" == "true" ]]; then
-    echo "  - scripts/run_dograh_init.sh"
+    echo "  - scripts/run_scaiva_init.sh"
     echo "  - scripts/lib/setup_common.sh"
     echo "  - deploy/templates/"
 fi

@@ -134,7 +134,7 @@ function Download-BundleFileForRef([string]$Destination, [string]$RemotePath, [s
 
 function Download-InitSupportBundle([string]$ProjectDir, [string]$Ref) {
     Download-BundleFileForRef (Join-Path $ProjectDir 'scripts/lib/setup_common.sh') 'scripts/lib/setup_common.sh' $Ref
-    Download-BundleFileForRef (Join-Path $ProjectDir 'scripts/run_dograh_init.sh') 'scripts/run_dograh_init.sh' $Ref
+    Download-BundleFileForRef (Join-Path $ProjectDir 'scripts/run_scaiva_init.sh') 'scripts/run_scaiva_init.sh' $Ref
     Download-BundleFileForRef (Join-Path $ProjectDir 'deploy/templates/nginx.remote.conf.template') 'deploy/templates/nginx.remote.conf.template' $Ref
     Download-BundleFileForRef (Join-Path $ProjectDir 'deploy/templates/turnserver.remote.conf.template') 'deploy/templates/turnserver.remote.conf.template' $Ref
 }
@@ -218,7 +218,7 @@ Write-Host ''
 $TotalSteps = 2
 $CurrentDir = (Get-Location).Path
 
-if ($env:DOGRAH_SKIP_DOWNLOAD -ne '1') {
+if ($env:SCAIVA_SKIP_DOWNLOAD -ne '1') {
     if ($UseCoturn) {
         Write-Info "[1/$TotalSteps] Downloading docker-compose.yaml and TURN helper bundle..."
     } else {
@@ -236,9 +236,9 @@ if ($env:DOGRAH_SKIP_DOWNLOAD -ne '1') {
 }
 
 if ($UseCoturn) {
-    Assert-PathExists 'scripts/run_dograh_init.sh' 'scripts/run_dograh_init.sh not found. Re-run setup_local.ps1 without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout.'
-    Assert-PathExists 'scripts/lib/setup_common.sh' 'scripts/lib/setup_common.sh not found. Re-run setup_local.ps1 without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout.'
-    Assert-PathExists 'deploy/templates/turnserver.remote.conf.template' 'deploy/templates/turnserver.remote.conf.template not found. Re-run setup_local.ps1 without DOGRAH_SKIP_DOWNLOAD=1, or use a full repo checkout.'
+    Assert-PathExists 'scripts/run_scaiva_init.sh' 'scripts/run_scaiva_init.sh not found. Re-run setup_local.ps1 without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout.'
+    Assert-PathExists 'scripts/lib/setup_common.sh' 'scripts/lib/setup_common.sh not found. Re-run setup_local.ps1 without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout.'
+    Assert-PathExists 'deploy/templates/turnserver.remote.conf.template' 'deploy/templates/turnserver.remote.conf.template not found. Re-run setup_local.ps1 without SCAIVA_SKIP_DOWNLOAD=1, or use a full repo checkout.'
 }
 
 Write-Info "[2/$TotalSteps] Creating environment file..."
@@ -280,7 +280,7 @@ Write-Host "Files created in $CurrentDir:" -ForegroundColor Blue
 Write-Host '  - docker-compose.yaml'
 Write-Host '  - .env'
 if ($UseCoturn) {
-    Write-Host '  - scripts/run_dograh_init.sh'
+    Write-Host '  - scripts/run_scaiva_init.sh'
     Write-Host '  - scripts/lib/setup_common.sh'
     Write-Host '  - deploy/templates/'
 }

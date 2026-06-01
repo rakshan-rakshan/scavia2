@@ -36,7 +36,7 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 
 if [[ $EUID -ne 0 ]]; then
-    dograh_fail "This script must be run as root or with sudo"
+    scaiva_fail "This script must be run as root or with sudo"
 fi
 
 if [[ ! -d "dograh" ]]; then
@@ -49,15 +49,15 @@ fi
 
 echo -e "${YELLOW}Enter your domain name (e.g., voice.yourcompany.com):${NC}"
 read -p "> " DOMAIN_NAME
-[[ -n "$DOMAIN_NAME" ]] || dograh_fail "Domain name cannot be empty"
+[[ -n "$DOMAIN_NAME" ]] || scaiva_fail "Domain name cannot be empty"
 
 if ! [[ "$DOMAIN_NAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
-    dograh_fail "Invalid domain name format"
+    scaiva_fail "Invalid domain name format"
 fi
 
 echo -e "${YELLOW}Enter your email address for SSL certificate notifications:${NC}"
 read -p "> " EMAIL_ADDRESS
-[[ -n "$EMAIL_ADDRESS" ]] || dograh_fail "Email address cannot be empty (required by Let's Encrypt)"
+[[ -n "$EMAIL_ADDRESS" ]] || scaiva_fail "Email address cannot be empty (required by Let's Encrypt)"
 
 echo ""
 echo -e "${GREEN}Configuration:${NC}"
@@ -70,7 +70,7 @@ SERVER_IP="$(curl -s ifconfig.me || curl -s icanhazip.com || echo "")"
 RESOLVED_IP="$(dig +short "$DOMAIN_NAME" | tail -1)"
 
 if [[ -z "$SERVER_IP" ]]; then
-    dograh_warn "Warning: Could not detect server's public IP"
+    scaiva_warn "Warning: Could not detect server's public IP"
 elif [[ "$RESOLVED_IP" != "$SERVER_IP" ]]; then
     echo -e "${YELLOW}Warning: Domain '$DOMAIN_NAME' resolves to '$RESOLVED_IP' but this server's IP is '$SERVER_IP'${NC}"
     echo -e "${YELLOW}Make sure your DNS A record points to this server before proceeding.${NC}"
@@ -93,19 +93,19 @@ elif command -v yum &> /dev/null; then
 elif command -v dnf &> /dev/null; then
     dnf install -y -q certbot
 else
-    dograh_fail "Could not detect package manager. Please install certbot manually."
+    scaiva_fail "Could not detect package manager. Please install certbot manually."
 fi
 echo -e "${GREEN}✓ Certbot installed${NC}"
 
 echo -e "${BLUE}[3/7] Stopping Dograh services...${NC}"
 cd dograh
-DOGRAH_DEPLOY_PROJECT_DIR="$(pwd)"
+SCAIVA_DEPLOY_PROJECT_DIR="$(pwd)"
 
 if [[ ! -f remote_up.sh || ! -f scripts/lib/setup_common.sh ]]; then
-    dograh_download_remote_support_bundle "$(pwd)" "main"
+    scaiva_download_remote_support_bundle "$(pwd)" "main"
 fi
 
-dograh_require_init_compose_layout "$(pwd)"
+scaiva_require_init_compose_layout "$(pwd)"
 
 if docker compose --profile remote ps --quiet 2>/dev/null | grep -q .; then
     docker compose --profile remote down
@@ -175,31 +175,31 @@ echo -e "${GREEN}✓${NC} Certificates copied to certs/ directory"
 echo ""
 
 echo -e "${BLUE}[5/7] Updating canonical remote settings and validating init-based config...${NC}"
-dograh_load_env_file .env
+scaiva_load_env_file .env
 
 if [[ -z "${SERVER_IP:-}" ]]; then
-    SERVER_IP="$(dograh_infer_server_ip "$(pwd)" || true)"
+    SERVER_IP="$(scaiva_infer_server_ip "$(pwd)" || true)"
 fi
 
-[[ -n "${SERVER_IP:-}" ]] || dograh_fail "Could not determine SERVER_IP from the existing install"
+[[ -n "${SERVER_IP:-}" ]] || scaiva_fail "Could not determine SERVER_IP from the existing install"
 
-dograh_set_env_key .env SERVER_IP "$SERVER_IP"
-dograh_set_env_key .env PUBLIC_HOST "$DOMAIN_NAME"
-dograh_set_env_key .env PUBLIC_BASE_URL "https://$DOMAIN_NAME"
-dograh_delete_env_key .env BACKEND_URL
-dograh_prepare_remote_install "$(pwd)"
+scaiva_set_env_key .env SERVER_IP "$SERVER_IP"
+scaiva_set_env_key .env PUBLIC_HOST "$DOMAIN_NAME"
+scaiva_set_env_key .env PUBLIC_BASE_URL "https://$DOMAIN_NAME"
+scaiva_delete_env_key .env BACKEND_URL
+scaiva_prepare_remote_install "$(pwd)"
 echo -e "${GREEN}✓ .env synchronized and init-based config validated${NC}"
 
 echo -e "${BLUE}[6/7] Setting up automatic certificate renewal...${NC}"
-DOGRAH_PATH="$(pwd)"
+SCAIVA_PATH="$(pwd)"
 
 cat > /etc/letsencrypt/renewal-hooks/deploy/dograh-reload.sh << HOOK_EOF
 #!/bin/bash
-cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem $DOGRAH_PATH/certs/local.crt
-cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem $DOGRAH_PATH/certs/local.key
-chmod 644 $DOGRAH_PATH/certs/local.crt $DOGRAH_PATH/certs/local.key
+cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem $SCAIVA_PATH/certs/local.crt
+cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem $SCAIVA_PATH/certs/local.key
+chmod 644 $SCAIVA_PATH/certs/local.crt $SCAIVA_PATH/certs/local.key
 
-cd $DOGRAH_PATH
+cd $SCAIVA_PATH
 docker compose --profile remote restart nginx 2>/dev/null || true
 HOOK_EOF
 chmod +x /etc/letsencrypt/renewal-hooks/deploy/dograh-reload.sh
@@ -224,8 +224,8 @@ echo ""
 echo -e "  ${BLUE}https://$DOMAIN_NAME${NC}"
 echo ""
 echo -e "${GREEN}SSL Certificate Details:${NC}"
-echo -e "  Certificate: $DOGRAH_PATH/certs/local.crt"
-echo -e "  Private Key: $DOGRAH_PATH/certs/local.key"
+echo -e "  Certificate: $SCAIVA_PATH/certs/local.crt"
+echo -e "  Private Key: $SCAIVA_PATH/certs/local.key"
 echo -e "  Auto-renewal: Enabled (certificates renew automatically)"
 echo ""
 echo -e "${YELLOW}Files modified:${NC}"

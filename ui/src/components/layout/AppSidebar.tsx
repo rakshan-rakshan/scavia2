@@ -13,6 +13,7 @@ import {
   FileText,
   Home,
   Key,
+  LayoutDashboard,
   LogOut,
   type LucideIcon,
   Megaphone,
@@ -63,6 +64,7 @@ type SidebarNavItem = {
   url: string;
   icon: LucideIcon;
   showsTelephonyWarning?: boolean;
+  badgeCount?: number;
 };
 
 type SidebarNavSection = {
@@ -79,6 +81,11 @@ const NAV_SECTIONS: SidebarNavSection[] = [
         title: "Overview",
         url: "/overview",
         icon: Home,
+      },
+      {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: LayoutDashboard,
       },
     ],
   },
@@ -131,6 +138,12 @@ const NAV_SECTIONS: SidebarNavSection[] = [
   {
     label: "OBSERVE",
     items: [
+      {
+        title: "Calls",
+        url: "/calls",
+        icon: Phone,
+        badgeCount: 3,
+      },
       {
         title: "Agent Runs",
         url: "/usage",
@@ -235,6 +248,16 @@ export function AppSidebar() {
           >
             {item.title}
           </span>
+          {item.badgeCount != null && item.badgeCount > 0 && (
+            <span
+              className={cn(
+                "inline-flex items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground",
+                isCollapsed && "absolute -right-0.5 -top-0.5",
+              )}
+            >
+              {item.badgeCount}
+            </span>
+          )}
           {showWarningDot && (
             isCollapsed ? (
               warningIndicator
@@ -264,7 +287,7 @@ export function AppSidebar() {
               className="notranslate flex items-center gap-2 px-2 text-xl font-bold"
               translate="no"
             >
-              Dograh
+              SCAIVA
               {versionInfo && (
                 <span
                   className="notranslate text-xs font-normal text-muted-foreground"

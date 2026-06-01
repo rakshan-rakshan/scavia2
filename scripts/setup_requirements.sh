@@ -28,9 +28,9 @@ done
 
 # Get the project root directory (parent of scripts)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-DOGRAH_DIR="$(dirname "$SCRIPT_DIR")"
+SCAIVA_DIR="$(dirname "$SCRIPT_DIR")"
 
-cd "$DOGRAH_DIR"
+cd "$SCAIVA_DIR"
 
 # Fail early if the active Python is not 3.12 or 3.13. uv pip installs into
 # whichever interpreter resolves here (the active venv, or PATH python3), so a

@@ -12,6 +12,10 @@ from typing import Annotated, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.services.telephony.providers.acefone.config import (
+    AcefoneConfigurationRequest,
+    AcefoneConfigurationResponse,
+)
 from api.services.telephony.providers.ari.config import (
     ARIConfigurationRequest,
     ARIConfigurationResponse,
@@ -46,6 +50,7 @@ from api.services.telephony.providers.vonage.config import (
 # if/elif chains that used to live in routes/organization.py.
 TelephonyConfigRequest = Annotated[
     Union[
+        AcefoneConfigurationRequest,
         ARIConfigurationRequest,
         CloudonixConfigurationRequest,
         PlivoConfigurationRequest,
@@ -66,6 +71,7 @@ class TelephonyConfigurationResponse(BaseModel):
     flat discriminated union.
     """
 
+    acefone: Optional[AcefoneConfigurationResponse] = None
     twilio: Optional[TwilioConfigurationResponse] = None
     plivo: Optional[PlivoConfigurationResponse] = None
     vonage: Optional[VonageConfigurationResponse] = None
@@ -132,6 +138,8 @@ class TelephonyConfigurationListResponse(BaseModel):
 
 
 __all__ = [
+    "AcefoneConfigurationRequest",
+    "AcefoneConfigurationResponse",
     "ARIConfigurationRequest",
     "ARIConfigurationResponse",
     "CloudonixConfigurationRequest",

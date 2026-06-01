@@ -42,11 +42,11 @@ if [[ -z "${SERVER_IP:-}" ]]; then
 fi
 
 if [[ -z "$SERVER_IP" ]]; then
-    dograh_fail "IP address cannot be empty"
+    scaiva_fail "IP address cannot be empty"
 fi
 
-if ! dograh_is_ipv4 "$SERVER_IP"; then
-    dograh_fail "Invalid IP address format"
+if ! scaiva_is_ipv4 "$SERVER_IP"; then
+    scaiva_fail "Invalid IP address format"
 fi
 
 FORCE_TURN_RELAY="${FORCE_TURN_RELAY:-false}"
@@ -76,7 +76,7 @@ if [[ -z "${DEPLOY_MODE:-}" ]]; then
         case "$mode_choice" in
             1|prebuilt) DEPLOY_MODE="prebuilt" ;;
             2|build) DEPLOY_MODE="build" ;;
-            *) dograh_fail "invalid choice '$mode_choice'" ;;
+            *) scaiva_fail "invalid choice '$mode_choice'" ;;
         esac
     else
         DEPLOY_MODE="prebuilt"
@@ -142,7 +142,7 @@ if [[ -z "$FASTAPI_WORKERS" ]]; then
     fi
 fi
 
-[[ "$FASTAPI_WORKERS" =~ ^[1-9][0-9]*$ ]] || dograh_fail "FASTAPI_WORKERS must be a positive integer (got: $FASTAPI_WORKERS)"
+[[ "$FASTAPI_WORKERS" =~ ^[1-9][0-9]*$ ]] || scaiva_fail "FASTAPI_WORKERS must be a positive integer (got: $FASTAPI_WORKERS)"
 
 if [[ "$DEPLOY_MODE" == "build" && "${REPO_SOURCE:-}" == "existing" ]]; then
     TARGET_DIR="."
@@ -150,7 +150,7 @@ else
     TARGET_DIR="dograh"
 fi
 
-if [[ "${DOGRAH_FORCE_OVERWRITE:-}" != "1" && "${DOGRAH_SKIP_DOWNLOAD:-}" != "1" ]]; then
+if [[ "${SCAIVA_FORCE_OVERWRITE:-}" != "1" && "${SCAIVA_SKIP_DOWNLOAD:-}" != "1" ]]; then
     if [[ -f "$TARGET_DIR/.env" ]]; then
         if [[ "$TARGET_DIR" == "." ]]; then
             existing_path="$(pwd)/.env"
@@ -170,7 +170,7 @@ if [[ "${DOGRAH_FORCE_OVERWRITE:-}" != "1" && "${DOGRAH_SKIP_DOWNLOAD:-}" != "1"
         echo -e "  ${BLUE}https://docs.dograh.com/deployment/update${NC}"
         echo ""
         echo -e "${BLUE}To wipe state and reinstall from scratch, re-run with:${NC}"
-        echo -e "  ${BLUE}DOGRAH_FORCE_OVERWRITE=1 <same command>${NC}"
+        echo -e "  ${BLUE}SCAIVA_FORCE_OVERWRITE=1 <same command>${NC}"
         echo ""
         exit 1
     fi
@@ -199,11 +199,11 @@ fi
 echo ""
 
 if [[ "$DEPLOY_MODE" == "build" ]]; then
-    if [[ "${DOGRAH_SKIP_DOWNLOAD:-}" == "1" ]]; then
+    if [[ "${SCAIVA_SKIP_DOWNLOAD:-}" == "1" ]]; then
         echo -e "${BLUE}[1/$TOTAL] Using existing repo in current directory${NC}"
     elif [[ "${REPO_SOURCE:-}" == "clone" ]]; then
         if [[ -e "dograh" ]]; then
-            dograh_fail "'dograh' directory already exists. Remove it or re-run with REPO_SOURCE=existing from inside it."
+            scaiva_fail "'dograh' directory already exists. Remove it or re-run with REPO_SOURCE=existing from inside it."
         fi
         echo -e "${BLUE}[1/$TOTAL] Cloning $FORK_REPO (branch: $BRANCH)...${NC}"
         git clone --branch "$BRANCH" --recurse-submodules "https://github.com/$FORK_REPO.git" dograh
@@ -213,20 +213,20 @@ if [[ "$DEPLOY_MODE" == "build" ]]; then
         echo -e "${BLUE}[1/$TOTAL] Using existing repo at $(pwd)${NC}"
     fi
 else
-    if [[ "${DOGRAH_SKIP_DOWNLOAD:-}" != "1" ]]; then
+    if [[ "${SCAIVA_SKIP_DOWNLOAD:-}" != "1" ]]; then
         mkdir -p dograh 2>/dev/null || true
         cd dograh
 
         echo -e "${BLUE}[1/$TOTAL] Downloading deployment bundle...${NC}"
         curl -fsSL -o docker-compose.yaml "https://raw.githubusercontent.com/dograh-hq/dograh/main/docker-compose.yaml"
-        dograh_download_remote_support_bundle "$(pwd)" "main"
+        scaiva_download_remote_support_bundle "$(pwd)" "main"
         echo -e "${GREEN}✓ Deployment bundle downloaded${NC}"
     else
         echo -e "${BLUE}[1/$TOTAL] Using deployment files in current directory${NC}"
     fi
 fi
 
-DOGRAH_DEPLOY_PROJECT_DIR="$(pwd)"
+SCAIVA_DEPLOY_PROJECT_DIR="$(pwd)"
 
 if [[ "$DEPLOY_MODE" != "prebuilt" ]]; then
     chmod +x remote_up.sh
@@ -285,7 +285,7 @@ ENV_EOF
 echo -e "${GREEN}✓ .env file created${NC}"
 
 echo -e "${BLUE}[5/$TOTAL] Validating remote init configuration...${NC}"
-dograh_prepare_remote_install "$(pwd)"
+scaiva_prepare_remote_install "$(pwd)"
 echo -e "${GREEN}✓ Remote init configuration validated${NC}"
 
 if [[ "$DEPLOY_MODE" == "build" ]]; then
@@ -324,7 +324,7 @@ if [[ "$DEPLOY_MODE" == "build" ]]; then
     echo "  - docker-compose.override.yaml  (build directives)"
 fi
 echo "  - remote_up.sh"
-echo "  - scripts/run_dograh_init.sh"
+echo "  - scripts/run_scaiva_init.sh"
 echo "  - deploy/templates/"
 echo "  - generate_certificate.sh"
 echo "  - certs/local.crt"

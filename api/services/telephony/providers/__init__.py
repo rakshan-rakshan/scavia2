@@ -7,6 +7,7 @@ or run_pipeline.
 """
 
 from api.services.telephony.providers import (  # noqa: F401  -- import for side effects (registration)
+    acefone,
     ari,
     cloudonix,
     plivo,
