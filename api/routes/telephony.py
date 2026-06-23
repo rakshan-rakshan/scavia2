@@ -132,7 +132,7 @@ async def initiate_call(
         raise HTTPException(status_code=404, detail="Workflow not found")
     execution_user_id = _get_execution_user_id(workflow)
 
-    # Check Dograh quota before initiating the call (apply per-workflow
+    # Check SCAIVA quota before initiating the call (apply per-workflow
     # model_overrides so the keys we will actually use are the ones checked).
     quota_result = await check_dograh_quota_by_user_id(
         execution_user_id, workflow_id=workflow.id

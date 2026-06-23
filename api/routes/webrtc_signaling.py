@@ -327,7 +327,7 @@ class SignalingManager:
         if org_id:
             set_current_org_id(org_id)
 
-        # Check Dograh quota before initiating the call (apply per-workflow
+        # Check SCAIVA quota before initiating the call (apply per-workflow
         # model_overrides so we evaluate the keys this workflow will use).
         quota_result = await check_dograh_quota(user, workflow_id=workflow_id)
         if not quota_result.has_quota:

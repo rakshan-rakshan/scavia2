@@ -548,7 +548,7 @@ async def start_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    # Check Dograh quota before starting campaign (apply per-workflow
+    # Check SCAIVA quota before starting campaign (apply per-workflow
     # model_overrides so we evaluate the keys this campaign will use).
     quota_result = await check_dograh_quota(user, workflow_id=campaign.workflow_id)
     if not quota_result.has_quota:
@@ -870,7 +870,7 @@ async def resume_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    # Check Dograh quota before resuming campaign (apply per-workflow
+    # Check SCAIVA quota before resuming campaign (apply per-workflow
     # model_overrides so we evaluate the keys this campaign will use).
     quota_result = await check_dograh_quota(user, workflow_id=campaign.workflow_id)
     if not quota_result.has_quota:

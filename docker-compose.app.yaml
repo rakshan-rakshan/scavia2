@@ -1,0 +1,155 @@
+# Self-contained local/hosting stack for SCAIVA — the 5 core services only
+# (postgres, redis, minio, api, ui). No cloudflared / nginx / coturn / init.
+#
+# This is the foundation for hosting (Hetzner): for cross-internet WebRTC you'd
+# later layer the remote profile (nginx TLS + coturn TURN) from docker-compose.yaml.
+#
+# Usage:
+#   1. Stop the hybrid infra first to free ports:
+#        docker compose -f docker-compose-local.yaml down
+#   2. Build + run everything:
+#        docker compose -f docker-compose.app.yaml up -d --build
+#   3. Open http://localhost:3010  (API at http://localhost:8000/docs)
+#
+# Migrations run automatically inside the api container (start_services_docker.sh).
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    command: >
+      --requirepass redissecret
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redissecret", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    networks:
+      - app-network
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: ${REGISTRY:-scaiva}/scaiva-api:latest
+    volumes:
+      - shared-tmp:/tmp
+    environment:
+      ENVIRONMENT: "local"
+      LOG_LEVEL: "INFO"
+      BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
+
+      # Internal Docker-network service names (containers talk to each other here)
+      DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/postgres"
+      REDIS_URL: "redis://:redissecret@redis:6379"
+
+      # Storage (MinIO). MINIO_PUBLIC_ENDPOINT is what the BROWSER uses, so it
+      # must be host-reachable, not the internal "minio" name.
+      ENABLE_AWS_S3: "false"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_PUBLIC_ENDPOINT: "${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_BUCKET: "voice-audio"
+      MINIO_SECURE: "false"
+
+      FASTAPI_WORKERS: "${FASTAPI_WORKERS:-1}"
+
+      # Auth (OSS local email/password + JWT)
+      AUTH_PROVIDER: "local"
+      OSS_JWT_SECRET: "${OSS_JWT_SECRET:?set OSS_JWT_SECRET to a strong secret}"
+
+      # Self-hosted fork: do not auto-provision new users to Dograh's hosted MPS.
+      ENABLE_DOGRAH_MPS_AUTO_PROVISION: "false"
+
+      # Telemetry off by default for a private fork.
+      ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/api/v1/health'').read()"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    networks:
+      - app-network
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    image: ${REGISTRY:-scaiva}/scaiva-ui:latest
+    environment:
+      BACKEND_URL: "${BACKEND_URL:-http://api:8000}"
+      NODE_ENV: "oss"
+      ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
+    ports:
+      - "3010:3010"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  shared-tmp:
+
+networks:
+  app-network:
+    driver: bridge

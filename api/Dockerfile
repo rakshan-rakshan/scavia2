@@ -151,7 +151,7 @@ COPY --chown=dograh:dograh ./scripts/start_services_docker.sh ./scripts/start_se
 COPY --from=ts-deps --chown=dograh:dograh /ts_validator/node_modules ./api/mcp_server/ts_validator/node_modules
 
 # Product documentation — read at runtime by the MCP docs tools
-# (search_dograh_docs / fetch_dograh_doc) so agents can learn Dograh.
+# (search_dograh_docs / fetch_dograh_doc) so agents can learn SCAIVA.
 COPY --chown=dograh:dograh ./docs ./docs
 
 ENV PYTHONPATH=/app

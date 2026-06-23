@@ -1,4 +1,4 @@
-"""Pydantic schemas for reusable Dograh tools.
+"""Pydantic schemas for reusable SCAIVA tools.
 
 These models are the single contract for tool creation/update across the
 REST API, generated SDKs, and the MCP authoring surface. Field descriptions
@@ -62,7 +62,7 @@ class ToolParameter(BaseModel):
 
 
 class PresetToolParameter(BaseModel):
-    """A parameter injected by Dograh at runtime."""
+    """A parameter injected by SCAIVA at runtime."""
 
     name: str = Field(description="Parameter name used as a key in the request body.")
     type: ToolParameterType = Field(description="JSON type for the resolved value.")
@@ -116,7 +116,7 @@ class HttpApiConfig(BaseModel):
     preset_parameters: Optional[List[PresetToolParameter]] = Field(
         default=None,
         description=(
-            "Parameters injected by Dograh from fixed values or workflow context "
+            "Parameters injected by SCAIVA from fixed values or workflow context "
             "templates."
         ),
     )

@@ -308,7 +308,7 @@ class OrganizationUsageClient(BaseDBClient):
             total_duration_seconds = 0
             for run in runs:
                 if run.cost_info:
-                    # Try to get dograh_token_usage first (new format)
+                    # Try to get dograh_token_usage first (new format, field name preserved for DB compat)
                     dograh_tokens = run.cost_info.get("dograh_token_usage", 0)
                     # If not present, calculate from total_cost_usd (old format)
                     if dograh_tokens == 0 and "total_cost_usd" in run.cost_info:

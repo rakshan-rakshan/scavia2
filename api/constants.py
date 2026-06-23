@@ -33,6 +33,14 @@ AUTH_PROVIDER = os.getenv("AUTH_PROVIDER", "local")
 DOGRAH_MPS_SECRET_KEY = os.getenv("DOGRAH_MPS_SECRET_KEY", None)
 MPS_API_URL = os.getenv("MPS_API_URL", "https://services.dograh.com")
 
+# The hosted Model Provider Service (MPS) at services.dograh.com is not available
+# to self-hosted forks. When this flag is false (the default), a fresh OSS user is NOT
+# auto-provisioned with an MPS-backed config — they get an empty config and choose their
+# own provider + API key in Settings. Set true only if you have MPS access.
+ENABLE_DOGRAH_MPS_AUTO_PROVISION = (
+    os.getenv("ENABLE_DOGRAH_MPS_AUTO_PROVISION", "false").lower() == "true"
+)
+
 # Storage Configuration
 ENABLE_AWS_S3 = os.getenv("ENABLE_AWS_S3", "false").lower() == "true"
 

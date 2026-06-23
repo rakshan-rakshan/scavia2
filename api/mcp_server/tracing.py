@@ -2,7 +2,7 @@
 
 The project-wide tracing setup in
 `api/services/pipecat/tracing_config.py` already routes spans to
-per-organization Langfuse projects based on the `dograh.org_id` span
+per-organization Langfuse projects based on the `scaiva.org_id` span
 attribute. This module plugs MCP tool calls into that pipeline:
 
     @mcp.tool

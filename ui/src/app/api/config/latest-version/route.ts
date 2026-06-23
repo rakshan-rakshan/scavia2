@@ -47,6 +47,12 @@ async function fetchLatestTag(image: string): Promise<string | null> {
 }
 
 export async function GET() {
+  // Update notifications are disabled for this self-hosted SCAIVA fork: there is no
+  // published SCAIVA image registry to compare against, and checking the upstream
+  // dograh-hq images would nag about a version this deployment doesn't track.
+  // Re-enable by removing this short-circuit once a SCAIVA registry exists.
+  return NextResponse.json({ latest: null }, { status: 200 });
+
   try {
     const results = await Promise.all(GHCR_IMAGES.map(fetchLatestTag));
 

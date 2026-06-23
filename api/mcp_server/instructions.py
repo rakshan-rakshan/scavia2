@@ -20,7 +20,7 @@ mistake the system has seen at least once.
 """
 
 DOGRAH_MCP_INSTRUCTIONS = """\
-You build and edit Dograh voice-AI workflows by emitting TypeScript that uses the `@dograh/sdk` package. Workflows are stored as JSON; this server projects them to TypeScript for editing and parses them back on save.
+You build and edit SCAIVA voice-AI workflows by emitting TypeScript that uses the `@dograh/sdk` package. Workflows are stored as JSON; this server projects them to TypeScript for editing and parses them back on save.
 
 ## Stages
 
@@ -42,7 +42,7 @@ The guide tool is the authoritative source for prompt-authoring craft (turn-taki
 3. Use the returned `tool_uuid` in workflow node `tool_uuids`, then call `create_workflow` or `save_workflow`.
 
 ### Reading documentation
-1. `search_docs` — use first for keyword or acronym lookup when the user is asking how Dograh works or how to configure something.
+1. `search_docs` — use first for keyword or acronym lookup when the user is asking how SCAIVA works or how to configure something.
 2. `read_doc` — fetch the full page once one result looks likely. Prefer this over reasoning from search summaries alone.
 3. `list_docs` — use when the user wants to browse a topic area or when search terms are too vague. Call it with no arguments for the top-level sections; returned section paths feed back into `list_docs`, returned page paths feed into `read_doc`.
 

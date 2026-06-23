@@ -179,7 +179,7 @@ async def _execute_resolved_target(
     """Shared execution path once the target workflow has been resolved."""
     execution_user_id = _get_execution_user_id(target.workflow)
 
-    # Check Dograh quota using the workflow owner's config and model overrides.
+    # Check SCAIVA quota using the workflow owner's config and model overrides.
     quota_result = await check_dograh_quota_by_user_id(
         execution_user_id,
         workflow_id=target.workflow.id,

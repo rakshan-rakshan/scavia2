@@ -5,7 +5,12 @@ from fastapi import Header, HTTPException, Query, WebSocket
 from loguru import logger
 from pydantic import ValidationError
 
-from api.constants import AUTH_PROVIDER, DOGRAH_MPS_SECRET_KEY, MPS_API_URL
+from api.constants import (
+    AUTH_PROVIDER,
+    DOGRAH_MPS_SECRET_KEY,
+    ENABLE_DOGRAH_MPS_AUTO_PROVISION,
+    MPS_API_URL,
+)
 from api.db import db_client
 from api.db.models import UserModel
 from api.enums import PostHogEvent
@@ -204,6 +209,16 @@ async def create_user_configuration_with_mps_key(
         UserConfiguration with MPS-provided API keys or None if failed
     """
 
+    # Self-hosted forks have no access to SCAIVA's hosted Model Provider Service.
+    # Unless auto-provisioning is explicitly enabled, skip the external call entirely
+    # so signup is fast and the user picks their own provider + key in Settings.
+    if not ENABLE_DOGRAH_MPS_AUTO_PROVISION:
+        logger.info(
+            "MPS auto-provisioning disabled; new user will configure their own "
+            "provider in Settings (set ENABLE_DOGRAH_MPS_AUTO_PROVISION=true to enable)."
+        )
+        return None
+
     async with httpx.AsyncClient() as client:
         # Use MPS API URL from constants
         if AUTH_PROVIDER == "local":
@@ -211,7 +226,7 @@ async def create_user_configuration_with_mps_key(
             response = await client.post(
                 f"{MPS_API_URL}/api/v1/service-keys/",
                 json={
-                    "name": f"Default Dograh Model Service Key",
+                    "name": f"Default SCAIVA Model Service Key",
                     "description": "Auto-generated key for OSS user",
                     "expires_in_days": 7,  # Short-lived for OSS
                     "created_by": user_provider_id,
@@ -229,7 +244,7 @@ async def create_user_configuration_with_mps_key(
             response = await client.post(
                 f"{MPS_API_URL}/api/v1/service-keys/",
                 json={
-                    "name": f"Default Dograh Model Service Key",
+                    "name": f"Default SCAIVA Model Service Key",
                     "description": f"Auto-generated key for organization {organization_id}",
                     "organization_id": organization_id,
                     "expires_in_days": 90,  # Longer-lived for authenticated users

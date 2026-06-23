@@ -8,6 +8,7 @@ from api.schemas.auth import AuthResponse, LoginRequest, SignupRequest, UserResp
 from api.services.auth.depends import create_user_configuration_with_mps_key, get_user
 from api.services.posthog_client import capture_event
 from api.utils.auth import create_jwt_token, hash_password, verify_password
+from api.utils.rate_limit import rate_limit
 
 router = APIRouter(
     prefix="/auth",
@@ -15,7 +16,11 @@ router = APIRouter(
 )
 
 
-@router.post("/signup", response_model=AuthResponse)
+@router.post(
+    "/signup",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit(limit=5, period=60))],
+)
 async def signup(request: SignupRequest):
     # Check if email is already taken
     existing_user = await db_client.get_user_by_email(request.email)
@@ -76,7 +81,11 @@ async def signup(request: SignupRequest):
     )
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    dependencies=[Depends(rate_limit(limit=5, period=60))],
+)
 async def login(request: LoginRequest):
     # Look up user by email
     user = await db_client.get_user_by_email(request.email)
