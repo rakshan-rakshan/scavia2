@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# One-time droplet bootstrap for Aria. Run as root on a fresh Ubuntu 24.04
-# DigitalOcean droplet (Bangalore / BLR1 recommended for India latency):
+# One-time server bootstrap for Aria. Run as root on a fresh Ubuntu 24.04
+# Hetzner CCX server (Falkenstein/Nuremberg = least-bad India latency); works
+# identically on any Ubuntu 24.04 VM (DO/Vultr Bangalore, etc.):
 #
 #   bash deploy/setup.sh
 #
 # Installs Docker + compose plugin and opens the firewall for HTTPS + WebRTC.
+# NOTE (Hetzner): if you ALSO enable a Hetzner Cloud Firewall in the console,
+# open the same ports there too: 22/tcp, 80/tcp, 443/tcp, 32768-60999/udp.
 set -euo pipefail
 
 echo ">>> Installing Docker..."
@@ -27,8 +30,8 @@ ufw --force enable
 
 echo ""
 echo ">>> Done. Next steps:"
-echo "    1. git clone <repo> && cd scavia2"
-echo "    2. cp .env.example .env   # fill ANTHROPIC_API_KEY + SARVAM_API_KEY (rotated)"
-echo "    3. Ensure aria.vaticanninfra.in A-record points to: $(curl -s -4 ifconfig.me || echo '<this droplet IP>')"
+echo "    1. git clone <repo> && cd scavia2 && git checkout claude/kind-hamilton-7knu0b"
+echo "    2. cp .env.example .env   # fill OPENROUTER_API_KEY + SARVAM_API_KEY (rotated)"
+echo "    3. Ensure aria.vaticanninfra.in A-record points to: $(curl -s -4 ifconfig.me || echo '<this server IP>')"
 echo "    4. docker compose -f deploy/docker-compose.prod.yml up -d --build"
 echo "    5. Open https://aria.vaticanninfra.in  ->  Talk to Aria"

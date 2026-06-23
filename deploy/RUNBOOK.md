@@ -6,19 +6,19 @@ Goal: a public HTTPS URL you open in a browser to talk to Aria.
 
 | # | Action | Where |
 |---|--------|-------|
-| 1 | **Add Anthropic credits** (account is at $0 → Aria can't think) | console.anthropic.com → Plans & Billing |
-| 2 | **Rotate** the Anthropic + Sarvam keys that were shared in chat | each provider's console |
-| 3 | **Create droplet**: DigitalOcean, region **Bangalore (BLR1)**, Ubuntu 24.04, 2 vCPU / 4 GB | digitalocean.com |
-| 4 | **DNS**: add A-record `aria.vaticanninfra.in` → droplet public IP | your DNS for vaticanninfra.in |
+| 1 | **Get an OpenRouter key** + add ~$5 credit (the LLM; Anthropic is NOT used) | openrouter.ai → Keys |
+| 2 | **Rotate** the Sarvam/Cartesia/Deepgram keys that were shared in chat | each provider's console |
+| 3 | **Create server**: Hetzner **CCX33** (8 vCPU/32 GB) for the 20–30 target, or **CCX23** (4 vCPU/16 GB) to pilot; **Falkenstein/Nuremberg**, Ubuntu 24.04 | hetzner.com/cloud |
+| 4 | **DNS**: add A-record `aria.vaticanninfra.in` → server public IP | your DNS for vaticanninfra.in |
 
 Cartesia (premium English voice) and Supabase (lead storage) are OPTIONAL —
 without them, English uses Sarvam and leads are logged (demo mode). The agent
 still talks with just the two required keys.
 
-## 1. Bootstrap the droplet (once)
+## 1. Bootstrap the server (once)
 
 ```bash
-ssh root@<droplet-ip>
+ssh root@<server-ip>
 git clone <your-repo-url> scavia2 && cd scavia2
 git checkout claude/kind-hamilton-7knu0b
 bash deploy/setup.sh          # installs Docker + opens firewall
@@ -30,15 +30,17 @@ bash deploy/setup.sh          # installs Docker + opens firewall
 cp .env.example .env
 nano .env
 # REQUIRED (rotated values):
-#   ANTHROPIC_API_KEY=sk-ant-...
+#   OPENROUTER_API_KEY=sk-or-...        # LLM_PROVIDER defaults to openrouter
 #   SARVAM_API_KEY=...
-# OPTIONAL: CARTESIA_*, SUPABASE_* (leave blank for demo mode)
+#   LLM_MODEL=openai/gpt-4o-mini        # optional; bump for better quality
+# OPTIONAL: CARTESIA_API_KEY+CARTESIA_VOICE_ID (premium EN voice),
+#           SUPABASE_URL+SUPABASE_SERVICE_KEY (real lead capture) — blank = demo mode
 ```
 
 ## 3. Confirm DNS, then launch
 
 ```bash
-dig +short aria.vaticanninfra.in     # must show the droplet IP before next step
+dig +short aria.vaticanninfra.in     # must show the server IP before next step
 docker compose -f deploy/docker-compose.prod.yml up -d --build
 docker compose -f deploy/docker-compose.prod.yml logs -f   # watch for "Aria server starting"
 ```
@@ -55,8 +57,11 @@ to hear it switch.
 
 - **Cert won't issue** → A-record not propagated yet, or port 80 blocked. `dig` it; check `ufw status`.
 - **Connects but silent (no audio)** → WebRTC UDP blocked. Confirm `ufw` allows `32768:60999/udp`; some corporate/mobile networks block UDP entirely — that's when you add a TURN server (coturn) as a follow-up.
-- **"credit balance too low"** in logs → Anthropic credits not added (step 0.1).
+- **LLM 401/402 in logs** → OpenRouter key wrong or out of credit (step 0.1).
 - **Sarvam 403** → wrong/rotated key, or Sarvam account issue.
+- **Conversation feels laggy** → expected on an EU (Hetzner) box for India callers
+  + India-hosted Sarvam; if unacceptable, redeploy the same stack on a Bangalore
+  VM (Vultr/DO) — only the region changes.
 
 ## 6. Update after a code change
 

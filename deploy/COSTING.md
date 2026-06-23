@@ -52,6 +52,29 @@ The app **works** but has **not been load-tested or tuned for high concurrency**
 3. The 3–4 calls/vCPU figure is an estimate — **run a load test** to calibrate
    before committing to a tier.
 
+## Hetzner CCX line (chosen) — dedicated AMD vCPU, EU
+
+> Decision: starting on Hetzner for cost. Prices ~excl. VAT, verify live.
+
+| Plan | vCPU / RAM | ~ €/mo | Est. concurrent calls* | Use |
+|---|---|---|---|---|
+| **CCX23** | 4 ded. / 16 GB | ~€25 | **~12–15** | Pilot / local-parity testing |
+| **CCX33** | 8 ded. / 32 GB | ~€49 | **~24–32** | The real 20–30 target |
+| CCX43 | 16 ded. / 64 GB | ~€96 | ~48–60 | Headroom / growth |
+
+*at ~3–4 calls/vCPU, conservative — confirm with a load test.
+
+**So:** CCX23 is fine to start and prove it out, but **CCX33 is the one that
+actually meets 20–30 concurrent.** Pick the EU location closest to India —
+**Falkenstein or Nuremberg (Germany)** — for the least bad latency.
+
+⚠️ **Hetzner = EU latency, eyes open.** The audio loop crosses to the EU twice
+each turn: Indian caller ↔ EU server (~130 ms) AND EU server ↔ **Sarvam** (STT/TTS
+is India-hosted, ~130 ms). OpenRouter (LLM) is global. This adds noticeable
+round-trip vs a Bangalore box. Acceptable for testing/pilot; if conversational
+latency feels off in production, the fix is a Bangalore server (Vultr/DO) — the
+deploy is identical, only the provider/region changes.
+
 ## Recommendation
 India product → **Vultr or DigitalOcean, Bangalore, 16 vCPU dedicated / 32 GB**
 for the 30-call target. Or start on the **8 vCPU lean** box, load-test, and size
