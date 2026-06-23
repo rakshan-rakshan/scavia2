@@ -1,0 +1,24 @@
+# Local WebRTC test — host networking so audio (UDP) reaches the browser.
+#
+# Plain `docker compose up` uses bridge networking and only publishes TCP 7860,
+# so WebRTC media can't connect → "ICE failed". This file uses host networking,
+# which fixes it.
+#
+#   Linux:            works natively.
+#   Windows / macOS:  Docker Desktop 4.34+ required. First enable
+#                     Settings → Resources → Network → "Enable host networking",
+#                     then Apply & Restart. (Without that, the page won't load.)
+#
+# Run:
+#   docker compose -f docker-compose.local.yml up --build
+#   then open  http://localhost:7860   (localhost is a secure context → mic works)
+services:
+  aria:
+    build: .
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "7860"
+    restart: unless-stopped
