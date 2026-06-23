@@ -67,8 +67,16 @@ class Settings:
     host: str = field(default_factory=lambda: _opt("HOST", "0.0.0.0"))
     port: int = field(default_factory=lambda: int(_opt("PORT", "7860")))
 
+    # Telephony (Phase 2 — Acefone). OPTIONAL: the browser channel works without
+    # these; they are only needed to provision/operate inbound PSTN calls.
+    acefone_api_token: str = field(default_factory=lambda: _opt("ACEFONE_API_TOKEN", ""))
+    acefone_did: str = field(default_factory=lambda: _opt("ACEFONE_DID", ""))
+
     def cartesia_enabled(self) -> bool:
         return bool(self.cartesia_voice_id)
+
+    def acefone_enabled(self) -> bool:
+        return bool(self.acefone_api_token)
 
 
 @lru_cache(maxsize=1)

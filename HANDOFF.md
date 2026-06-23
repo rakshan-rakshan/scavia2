@@ -67,17 +67,20 @@ Anthropic LLM (`claude-sonnet-4-6`) → TTS split: **Cartesia `sonic-2`** for En
 
 ```
 app/
-  server.py         FastAPI app: /offer (WebRTC), /ws, serves static/index.html
-  bot.py            Pipecat pipeline assembly + run loop
-  transports.py     SmallWebRTC transport wiring
+  server.py         FastAPI: /api/offer (WebRTC), /telephony/ws (Acefone),
+                    /health, serves static/index.html
+  bot.py            build_pipeline (assembly, injectable services) + run_bot
+  transports.py     SmallWebRTC (browser) + Acefone WebSocket transport wiring
+  serializers.py    AcefoneFrameSerializer (Twilio-clone μ-law 8 kHz) — Phase 2
   tools.py          LLM tools: capture_lead, switch_language, flag_for_human,
                     transfer_to_human, end_call  + Supabase upsert/insert helpers
   system_prompt.py  Aria persona, qualification script, guardrail instructions
-  config.py         env loading + REQUIRED/OPTIONAL validation
+  config.py         env loading + REQUIRED/OPTIONAL validation (+ Acefone opt.)
 static/index.html   Browser client ("Talk to Aria" button, WebRTC offer)
 db/schema.sql       Supabase tables: leads, human_followup, (+ call log)
 knowledge/KNOWLEDGE_BASE.md   Project + domain knowledge (Brigade Gateway)
-tests/              47 passing fast tests + opt-in live LLM guardrail eval
+tests/              62 passing fast tests (tools, guardrails, telephony,
+                    pipeline smoke) + opt-in live LLM guardrail eval
                     (marker: llm_eval, gated by RUN_LLM_EVAL=1)
 .claude/agents/     Subagent role defs (planner, builder-*, verifier, simplifier)
 Dockerfile          port 7860, ffmpeg installed
@@ -112,13 +115,18 @@ uvicorn app.server:app --reload --host 0.0.0.0 --port 7860
 
 ## 6. Next steps (recommended order)
 
-1. **Get `scavia2` into scope + push the branch** (section 0).
-2. **First live smoke test**: install deps, fix any pipecat import errors, run a real
-   browser call with real keys. Confirm Aria greets in English < 3 s.
+1. ✅ **DONE** — `scavia2` in scope, branch pushed, deps install fixed, import
+   paths verified, app boots, 62 tests green.
+2. **First live smoke test** (needs the 6 real keys + a browser mic — can't run
+   in a headless container): `uvicorn app.server:app …`, open the page, click
+   "Talk to Aria", confirm she greets in English < 3 s.
 3. Work the **Phase 0 Definition of Done** checklist in README (barge-in, language
    auto-switch, full qualification → `leads` row, all guardrails fire, opt-out → `end_call`).
 4. Optional: run the live guardrail eval — `RUN_LLM_EVAL=1 pytest -m llm_eval`.
-5. **Phase 2 (not built)**: telephony via Acefone DID → SIP (placeholders in `.env.example`).
+5. ✅ **Phase 2 (BUILT)**: Acefone telephony over `/telephony/ws` (Twilio-clone
+   WS). Point the DID's media-stream webhook at `wss://<host>/telephony/ws`.
+   Pre-prod gate: verify Sarvam STT keepalive/reconnect (pipecat #3699) for
+   long calls. See README "Phase 2 — Telephony".
 6. **Phase 3 (not built)**: outbound campaigns from CRM events.
 
 ---

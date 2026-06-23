@@ -55,12 +55,45 @@ def create_stt_service():
     )
 
 
-def create_acefone_transport(*args, **kwargs):  # pragma: no cover - Phase 2 stub
+def create_acefone_transport(
+    websocket,
+    stream_sid: str,
+    call_sid: str | None = None,
+    *,
+    session_timeout_secs: int | None = None,
+):
     """Phase 2: Acefone Voice Streaming transport (Twilio-clone WS protocol).
 
-    Build `AcefoneFrameSerializer` from pipecat's `TwilioFrameSerializer`
-    (μ-law 8 kHz, base64, events connected/start/media/stop/mark/clear,
-    160-byte frame multiples). Gate: Sarvam STT keepalive/reconnect (#3699)
-    MUST be fixed before any live call.
+    Wraps a FastAPI/Starlette ``WebSocket`` (already accepted by the route) in a
+    pipecat ``FastAPIWebsocketTransport`` driven by ``AcefoneFrameSerializer``.
+    Audio is μ-law 8 kHz both ways (telephony), so we pin the transport's audio
+    rates to 8000 Hz and disable WAV headers — the serializer converts to/from
+    PCM for the pipeline. Silero VAD + interruptions are enabled, exactly as the
+    browser transport, so the SAME `run_bot` pipeline serves both channels.
+
+    The websocket MUST already be accepted and the ``start`` handshake consumed
+    (use ``AcefoneFrameSerializer.parse_start`` to obtain ``stream_sid`` /
+    ``call_sid``) before calling this.
     """
-    raise NotImplementedError("Acefone telephony transport is a Phase 2 deliverable (PRD §10).")
+    from pipecat.audio.vad.silero import SileroVADAnalyzer
+    from pipecat.transports.websocket.fastapi import (
+        FastAPIWebsocketParams,
+        FastAPIWebsocketTransport,
+    )
+
+    from app.serializers import AcefoneFrameSerializer
+
+    serializer = AcefoneFrameSerializer(stream_sid=stream_sid, call_sid=call_sid)
+
+    params = FastAPIWebsocketParams(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        add_wav_header=False,
+        vad_analyzer=SileroVADAnalyzer(),
+        serializer=serializer,
+        audio_in_sample_rate=8000,
+        audio_out_sample_rate=8000,
+        session_timeout=session_timeout_secs,
+    )
+
+    return FastAPIWebsocketTransport(websocket=websocket, params=params)

@@ -163,13 +163,53 @@ The pipeline has **not** had a live WebRTC call yet (that needs real API keys
 - [x] `SarvamSTTService.InputParams` exposes `mode` + `prompt` (saaras:v3).
 - [x] All `app/*` modules import; FastAPI app boots, startup env-validation
       runs, `GET /health` → 200, `GET /` serves the UI.
-- [x] Fast test suite green: **49 passed, 5 skipped** (`pytest`).
+- [x] `build_pipeline` assembles the full browser-agent pipeline with REAL
+      pipecat components (LLM service, context aggregator, all 5 tools) — proven
+      by `tests/test_pipeline_smoke.py`, not just imports.
+- [x] Fast test suite green: **62 passed, 5 skipped** (`pytest`) — includes the
+      Phase 2 telephony serializer/transport tests and the pipeline smoke test.
 - [ ] Live call / Supabase write / guardrails firing — pending real keys
       (tracked in the Phase 0 Definition of Done above).
 
+### How to get the final (live) confirmation
+
+The only remaining unknown is a real audio call. To confirm the browser agent
+end-to-end on your machine:
+
+```bash
+cp .env.example .env          # fill the 6 REQUIRED keys
+# apply db/schema.sql in the Supabase SQL editor
+uvicorn app.server:app --host 0.0.0.0 --port 7860
+# open http://localhost:7860 → "Talk to Aria" (mic works on localhost/HTTPS)
+```
+
+Then walk the Phase 0 Definition of Done checklist above.
+
 ---
 
-## Phase 2 / 3 (Not Built)
+## Phase 2 — Telephony (Acefone) — BUILT
 
-- **Phase 2 — Telephony**: Inbound PSTN calls via Acefone DID → SIP → pipecat `DailyTransport` or `TwilioTransport`. Config placeholders are in `.env.example` (`ACEFONE_API_TOKEN`, `ACEFONE_DID`).
-- **Phase 3 — Outbound campaigns**: Automated outbound qualification calls triggered from CRM events. Requires dialler integration and consent-management layer.
+Inbound PSTN calls reach Aria over a WebSocket using Acefone's Voice-Streaming
+protocol (a Twilio Media Streams clone: μ-law 8 kHz, base64, `streamSid`
+envelope). The **same** `run_bot` pipeline serves both browser and phone — only
+the transport differs.
+
+- Endpoint: **`wss://<your-host>/telephony/ws`** (`app/server.py:telephony_ws`).
+  Point your Acefone DID's media-stream webhook here.
+- Serializer: `AcefoneFrameSerializer` (`app/serializers.py`) — subclasses
+  pipecat's `TwilioFrameSerializer`; `auto_hang_up` defaults off (teardown is
+  WebSocket-close, so no provider REST creds are required to run).
+- Transport: `create_acefone_transport` (`app/transports.py`) wires a
+  `FastAPIWebsocketTransport` at 8 kHz with Silero VAD + interruptions.
+- Config: `ACEFONE_API_TOKEN`, `ACEFONE_DID` in `.env` (OPTIONAL — the app boots
+  and the browser channel works without them).
+- Tests: `tests/test_telephony.py` (handshake parsing, μ-law (de)serialization
+  round-trip, interruption→`clear`, transport factory) — all keyless.
+
+> Live-call gate (from the original PRD): verify Sarvam STT keepalive/reconnect
+> behaviour (pipecat #3699) before relying on long production phone calls.
+
+## Phase 3 — Outbound campaigns (Not Built)
+
+Automated outbound qualification calls triggered from CRM events. Requires a
+dialler/origination integration and a consent-management layer.

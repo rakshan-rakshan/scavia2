@@ -8,10 +8,11 @@ or:
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, WebSocket
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -86,6 +87,47 @@ async def offer(request: dict, background_tasks: BackgroundTasks) -> dict:
     answer = conn.get_answer()
     _connections[answer["pc_id"]] = conn
     return answer
+
+
+@app.websocket("/telephony/ws")
+async def telephony_ws(websocket: WebSocket) -> None:
+    """Phase 2: Acefone Voice Streaming endpoint.
+
+    Acefone connects here over WebSocket and speaks the Twilio Media Streams
+    protocol. We accept the socket, consume the handshake until the ``start``
+    event (which carries the stream/call SIDs and any caller-language hint), then
+    run the SAME conversation pipeline as the browser via ``run_bot``.
+    """
+    from app.serializers import AcefoneFrameSerializer
+    from app.transports import create_acefone_transport
+
+    await websocket.accept()
+
+    # Consume the handshake (Acefone sends `connected` then `start`). Bail if no
+    # `start` arrives in the first few messages.
+    stream_sid = call_sid = None
+    start_lang = "en"
+    for _ in range(5):
+        try:
+            raw = await websocket.receive_text()
+        except Exception:
+            break
+        try:
+            message = json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        if message.get("event") == "start":
+            stream_sid, call_sid, start_lang = AcefoneFrameSerializer.parse_start(message)
+            break
+
+    if not stream_sid:
+        logger.warning("telephony: no usable `start` event; closing socket")
+        await websocket.close(code=1008)
+        return
+
+    logger.info("telephony call connected: stream=%s call=%s lang=%s", stream_sid, call_sid, start_lang)
+    transport = create_acefone_transport(websocket, stream_sid, call_sid)
+    await run_bot(transport, channel="acefone", start_lang=start_lang)
 
 
 @app.get("/")

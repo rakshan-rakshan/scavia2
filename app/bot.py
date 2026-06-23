@@ -26,11 +26,27 @@ from app.transports import create_stt_service, create_tts_service
 logger = logging.getLogger("aria.bot")
 
 
-async def run_bot(transport, channel: str = "browser", start_lang: str = "en") -> None:
-    """Build and run the conversation pipeline for one session."""
-    from pipecat.frames.frames import EndFrame, LLMRunFrame
+def build_pipeline(
+    transport,
+    channel: str = "browser",
+    start_lang: str = "en",
+    *,
+    stt=None,
+    llm=None,
+    tts=None,
+):
+    """Assemble the conversation pipeline for one session.
+
+    Returns ``(task, state)``. Transport-agnostic: the browser (SmallWebRTC) and
+    telephony (Acefone WebSocket) transports both feed the identical pipeline.
+
+    The ``stt`` / ``llm`` / ``tts`` keyword args allow callers (and tests) to
+    inject pre-built services; when omitted, the real services are constructed
+    from settings. Splitting assembly out of :func:`run_bot` lets the pipeline be
+    built and inspected without starting the (blocking) runner — see
+    ``tests/test_pipeline_smoke.py``.
+    """
     from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
     from pipecat.services.anthropic.llm import AnthropicLLMService
@@ -39,10 +55,15 @@ async def run_bot(transport, channel: str = "browser", start_lang: str = "en") -
     state = SessionState(channel=channel, current_language=start_lang)
     state.language_path.append(LANGUAGE_NAMES.get(start_lang, "english"))
 
-    # --- Services ---
-    stt = create_stt_service()
-    tts = create_tts_service(start_lang)
-    llm = AnthropicLLMService(api_key=settings.anthropic_api_key, model=settings.anthropic_model)
+    # --- Services (injectable for tests) ---
+    if stt is None:
+        stt = create_stt_service()
+    if tts is None:
+        tts = create_tts_service(start_lang)
+    if llm is None:
+        llm = AnthropicLLMService(
+            api_key=settings.anthropic_api_key, model=settings.anthropic_model
+        )
 
     # --- Context (system prompt + tools) ---
     messages = [{"role": "system", "content": build_system_prompt(start_lang)}]
@@ -73,11 +94,23 @@ async def run_bot(transport, channel: str = "browser", start_lang: str = "en") -
     )
 
     # --- Wire session hooks the tools call back into ---
+    from pipecat.frames.frames import EndFrame
+
     async def _end_session() -> None:
         await task.queue_frames([EndFrame()])
 
     state.end_session = _end_session
     state.on_language_switch = _make_language_logger()  # P0: log only; hot-swap = P1.5
+
+    return task, state
+
+
+async def run_bot(transport, channel: str = "browser", start_lang: str = "en") -> None:
+    """Build and run the conversation pipeline for one session (any transport)."""
+    from pipecat.frames.frames import LLMRunFrame
+    from pipecat.pipeline.runner import PipelineRunner
+
+    task, _state = build_pipeline(transport, channel=channel, start_lang=start_lang)
 
     # --- Transport lifecycle: greet first, clean up on disconnect ---
     @transport.event_handler("on_client_connected")
