@@ -10,7 +10,7 @@ from httpx import HTTPStatusError
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 
-from api.constants import DEPLOYMENT_MODE
+from api.constants import DEPLOYMENT_MODE, ENABLE_DOGRAH_MPS_AUTO_PROVISION
 from api.db import db_client
 from api.db.agent_trigger_client import TriggerPathConflictError
 from api.db.models import UserModel
@@ -446,8 +446,15 @@ async def create_workflow_from_template(
         HTTPException: If MPS API call fails
     """
     try:
-        # Call MPS API to generate workflow using the client
-        if DEPLOYMENT_MODE == "oss":
+        # Call MPS API to generate workflow using the client.
+        # When MPS auto-provision is disabled (self-hosted OSS), skip the upstream
+        # Dograh call entirely and create a blank workflow the user fills in the builder.
+        if DEPLOYMENT_MODE == "oss" and not ENABLE_DOGRAH_MPS_AUTO_PROVISION:
+            workflow_data = {
+                "name": f"{request.use_case} ({request.call_type.title()})",
+                "workflow_definition": {},
+            }
+        elif DEPLOYMENT_MODE == "oss":
             workflow_data = await mps_service_key_client.call_workflow_api(
                 call_type=request.call_type.upper(),
                 use_case=request.use_case,
