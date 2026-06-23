@@ -1,7 +1,7 @@
 # One-command local test:  docker compose up --build
 # Then open http://localhost:7860 and click "Talk to Aria".
 #
-# Minimum to hear Aria talk: set ANTHROPIC_API_KEY and SARVAM_API_KEY in .env
+# Minimum to hear Aria talk: set OPENROUTER_API_KEY and SARVAM_API_KEY in .env
 # (copy .env.example to .env). Cartesia and Supabase are optional — without them
 # English uses Sarvam TTS and leads are logged instead of saved (demo mode).
 services:
