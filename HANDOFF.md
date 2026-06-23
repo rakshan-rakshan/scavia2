@@ -39,19 +39,27 @@ Anthropic LLM (`claude-sonnet-4-6`) → TTS split: **Cartesia `sonic-2`** for En
 
 ---
 
-## 2. Status — Phase 0 is CODE-COMPLETE, NOT yet runtime-verified
+## 2. Status — Phase 0 is INSTALL-VERIFIED & BOOT-VERIFIED, NOT yet live
 
-- ✅ All source written, committed (`1acdfa6`).
-- ✅ **47 fast tests passing** (no keys/network): `pytest` → `tests/test_tools.py`,
+- ✅ All source written and committed.
+- ✅ **49 fast tests passing** (no keys/network): `pytest` → `tests/test_tools.py`,
   `tests/test_guardrails.py` (guardrail prompt-logic + tool side-effects).
-- ⚠️ **Never run live.** No real API keys were ever used. The pipeline has NOT
-  connected a real browser call, STT/TTS, or Supabase write yet.
-- ⚠️ **pipecat import paths are the #1 risk.** pipecat moves module locations between
-  minor releases. Expect to fix imports for `SarvamSTTService` / `CartesiaTTSService` /
-  `AnthropicLLMService` against the actually-installed version. See README "Pipecat Import Paths".
-- ⚠️ `sarvamai>=0.1.30` override (pipecat issue #3783) — `pipecat[sarvam]` pins an old
-  `sarvamai` that lacks `saaras:v3` `mode`/`prompt`. requirements.txt reinstalls a newer one.
-  Verify: `python -c "import sarvamai; print(sarvamai.__version__)"` ≥ 0.1.30.
+- ✅ **Dependency + import blocker RESOLVED (2026-06-23).** `requirements.txt`
+  now pins `pipecat-ai==0.0.108`. Clean-venv install resolves with `pip check`
+  clean, every pipecat import path resolves, and the FastAPI app boots
+  (`/health` → 200, `/` serves UI). See README "Verification Status".
+- ⚠️ **Still never run live.** No real API keys were used. The pipeline has NOT
+  connected a real browser call, real STT/TTS, or a real Supabase write yet —
+  that is the remaining Phase 0 work (needs the 6 REQUIRED keys + a browser).
+- ✅ **pipecat import paths (was the #1 risk) — verified** against the pinned
+  0.0.108 for `SarvamSTTService` / `SarvamTTSService` / `CartesiaTTSService` /
+  `AnthropicLLMService` / SmallWebRTC transport / Silero VAD.
+- ✅ **saaras:v3 / sarvamai (was pipecat issue #3783) — resolved.** There is no
+  published `sarvamai 0.1.30`; that old pin was unsatisfiable and blocked every
+  install. pipecat 0.0.108 pins `sarvamai==0.1.26`, whose SarvamSTTService
+  already accepts `mode`/`prompt`. The override line was removed. Verify:
+  `python -c "import pipecat, sarvamai; print(pipecat.__version__, sarvamai.__version__)"`
+  → expect `0.0.108 0.1.26`.
 
 ---
 
