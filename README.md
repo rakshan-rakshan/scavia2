@@ -4,6 +4,34 @@ A self-hosted multilingual AI voice agent that qualifies real-estate leads over 
 
 ---
 
+## ⚡ Test it in 5 minutes (Docker)
+
+You only need **two** keys to hear Aria talk: an Anthropic key and a Sarvam key.
+No Cartesia, no Supabase, no database setup.
+
+```bash
+cp .env.example .env
+# edit .env — set just these two:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   SARVAM_API_KEY=...
+
+docker compose up --build
+# open http://localhost:7860  →  click "Talk to Aria", allow the mic
+```
+
+That's it. In this **demo mode**: English voice uses Sarvam (skip Cartesia), and
+captured leads are *logged to the console* instead of saved to a DB (skip
+Supabase). To go full production, fill in the rest of `.env` and apply
+`db/schema.sql` (see "Local Setup" below).
+
+> Mic note: browsers only allow microphone access on `localhost` or HTTPS — so
+> `http://localhost:7860` works locally; a remote deployment needs TLS.
+
+No Docker? `pip install -r requirements.txt` then
+`uvicorn app.server:app --host 0.0.0.0 --port 7860` does the same thing.
+
+---
+
 ## Architecture
 
 ```

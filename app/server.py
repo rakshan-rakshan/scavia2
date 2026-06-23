@@ -33,8 +33,13 @@ _connections: dict[str, object] = {}
 @app.on_event("startup")
 async def _validate_env() -> None:
     # Fail fast if required secrets are missing (raises before serving traffic).
-    get_settings()
+    # Required: ANTHROPIC_API_KEY + SARVAM_API_KEY. Everything else degrades.
+    s = get_settings()
     logger.info("Aria server starting; required env validated.")
+    if not s.cartesia_enabled():
+        logger.warning("Cartesia not configured — English TTS falls back to Sarvam bulbul:v2.")
+    if not s.supabase_enabled():
+        logger.warning("Supabase not configured — DEMO mode: leads are logged, NOT persisted.")
 
 
 @app.get("/health")

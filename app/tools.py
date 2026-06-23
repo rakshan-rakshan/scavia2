@@ -33,8 +33,11 @@ _LEAD_FIELDS = {
 }
 
 
-def _supabase() -> Client:
+def _supabase() -> Optional[Client]:
+    """Build a Supabase client, or return None in demo mode (no DB configured)."""
     s = get_settings()
+    if not s.supabase_enabled():
+        return None
     return create_client(s.supabase_url, s.supabase_service_key)
 
 
@@ -55,10 +58,14 @@ class SessionState:
     end_session: Callable[[], Awaitable[None]] | None = None
 
     _client: Client | None = None
+    _db_resolved: bool = False
 
-    def db(self) -> Client:
-        if self._client is None:
-            self._client = _supabase()
+    def db(self) -> Optional[Client]:
+        """Return the Supabase client, or None when running in demo mode."""
+        if not self._db_resolved:
+            if self._client is None:
+                self._client = _supabase()
+            self._db_resolved = True
         return self._client
 
     def record_guardrail(self, kind: str, detail: str) -> None:
@@ -104,8 +111,13 @@ async def _capture_lead(state: SessionState, params) -> None:
     if not clean:
         await params.result_callback({"status": "noop", "reason": "no valid fields"})
         return
+    client = state.db()
+    if client is None:  # demo mode — no Supabase configured
+        logger.info("capture_lead (DEMO, not persisted): fields=%s", list(clean))
+        await params.result_callback({"status": "ok", "persisted": False, "saved": list(clean)})
+        return
     try:
-        state.lead_id = await asyncio.to_thread(_upsert_lead, state.db(), state.lead_id, clean)
+        state.lead_id = await asyncio.to_thread(_upsert_lead, client, state.lead_id, clean)
         logger.info("capture_lead: lead=%s fields=%s", state.lead_id, list(clean))
         await params.result_callback({"status": "ok", "lead_id": state.lead_id, "saved": list(clean)})
     except Exception as exc:  # never crash the call on a DB hiccup
@@ -137,8 +149,13 @@ async def _flag_for_human(state: SessionState, params) -> None:
     question = str(params.arguments.get("question", "")).strip()
     context = str(params.arguments.get("context", "")).strip()
     state.record_guardrail("flag_for_human", question[:200])
+    client = state.db()
+    if client is None:  # demo mode — no Supabase configured
+        logger.info("flag_for_human (DEMO, not persisted): %s", question[:200])
+        await params.result_callback({"status": "ok", "persisted": False})
+        return
     try:
-        await asyncio.to_thread(_insert_followup, state.db(), state.lead_id, question, context)
+        await asyncio.to_thread(_insert_followup, client, state.lead_id, question, context)
         await params.result_callback({"status": "ok"})
     except Exception as exc:
         logger.exception("flag_for_human failed")
@@ -162,10 +179,14 @@ async def _transfer_to_human(state: SessionState, params) -> None:
 async def _end_call(state: SessionState, params) -> None:
     reason = str(params.arguments.get("reason", "")).strip()
     logger.info("end_call: %s", reason)
-    try:
-        await asyncio.to_thread(_insert_call_log, state.db(), state, None)
-    except Exception:
-        logger.exception("call_log write failed (continuing to end)")
+    client = state.db()
+    if client is not None:
+        try:
+            await asyncio.to_thread(_insert_call_log, client, state, None)
+        except Exception:
+            logger.exception("call_log write failed (continuing to end)")
+    else:
+        logger.info("end_call (DEMO): call_log not persisted")
     await params.result_callback({"status": "ok", "ended": True})
     if state.end_session:
         try:

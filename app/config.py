@@ -49,8 +49,9 @@ class Settings:
     sarvam_api_key: str = field(default_factory=lambda: _req("SARVAM_API_KEY"))
     sarvam_stt_model: str = field(default_factory=lambda: _opt("SARVAM_STT_MODEL", "saaras:v3"))
 
-    # TTS (EN) — Cartesia (D3).
-    cartesia_api_key: str = field(default_factory=lambda: _req("CARTESIA_API_KEY"))
+    # TTS (EN) — Cartesia (D3). OPTIONAL: if unset, English falls back to
+    # Sarvam bulbul:v2 (en-IN), so you can demo the agent with no Cartesia account.
+    cartesia_api_key: str = field(default_factory=lambda: _opt("CARTESIA_API_KEY", ""))
     # Voice ID is account-specific; supply a premium English voice in .env.
     cartesia_voice_id: str = field(default_factory=lambda: _opt("CARTESIA_VOICE_ID", ""))
     cartesia_model: str = field(default_factory=lambda: _opt("CARTESIA_MODEL", "sonic-2"))
@@ -59,9 +60,11 @@ class Settings:
     sarvam_tts_model: str = field(default_factory=lambda: _opt("SARVAM_TTS_MODEL", "bulbul:v2"))
     sarvam_tts_speaker: str = field(default_factory=lambda: _opt("SARVAM_TTS_SPEAKER", "anushka"))
 
-    # Database (Supabase) — service key, server-side only.
-    supabase_url: str = field(default_factory=lambda: _req("SUPABASE_URL"))
-    supabase_service_key: str = field(default_factory=lambda: _req("SUPABASE_SERVICE_KEY"))
+    # Database (Supabase) — service key, server-side only. OPTIONAL: if unset, the
+    # agent runs in DEMO mode — qualification still works and tool calls are logged,
+    # but leads are not persisted. Set both for production lead capture.
+    supabase_url: str = field(default_factory=lambda: _opt("SUPABASE_URL", ""))
+    supabase_service_key: str = field(default_factory=lambda: _opt("SUPABASE_SERVICE_KEY", ""))
 
     # Server
     host: str = field(default_factory=lambda: _opt("HOST", "0.0.0.0"))
@@ -73,7 +76,11 @@ class Settings:
     acefone_did: str = field(default_factory=lambda: _opt("ACEFONE_DID", ""))
 
     def cartesia_enabled(self) -> bool:
-        return bool(self.cartesia_voice_id)
+        # Need both a key and a voice id; otherwise English falls back to Sarvam.
+        return bool(self.cartesia_api_key and self.cartesia_voice_id)
+
+    def supabase_enabled(self) -> bool:
+        return bool(self.supabase_url and self.supabase_service_key)
 
     def acefone_enabled(self) -> bool:
         return bool(self.acefone_api_token)
