@@ -1,0 +1,9 @@
+# Caddy auto-provisions a Let's Encrypt TLS cert for this domain and reverse
+# proxies to the Aria app. WebSocket upgrades (/api/offer signaling responses
+# and /telephony/ws) are handled automatically by Caddy v2.
+#
+# Prerequisite: an A record for aria.vaticanninfra.in must point at this
+# droplet's public IP BEFORE starting Caddy, or cert issuance will fail.
+aria.vaticanninfra.in {
+	reverse_proxy 127.0.0.1:7860
+}
