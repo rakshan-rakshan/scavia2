@@ -1,0 +1,9 @@
+# Development / test dependencies (do NOT edit requirements.txt)
+#
+# Fast suite (no keys, no network):
+pytest>=8.0.0,<10.0.0
+pytest-asyncio>=0.23.0,<2.0.0
+python-dotenv>=1.0.0,<2.0.0   # already in requirements.txt but listed here for dev environments
+
+# Live LLM guardrail eval (opt-in, requires RUN_LLM_EVAL=1 + real ANTHROPIC_API_KEY):
+anthropic>=0.30.0,<1.0.0

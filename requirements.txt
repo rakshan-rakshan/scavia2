@@ -1,0 +1,28 @@
+# Brigade Gateway Voice Lead Qualifier — Python dependencies
+#
+# IMPORTANT — pipecat issue #3783 override:
+# The pipecat[sarvam] extra historically pinned sarvamai==0.1.21, which lacks
+# saaras:v3 `mode` and `prompt` parameters.  We install sarvamai>=0.1.30
+# *after* pipecat so pip resolves to a recent version that supports saaras:v3.
+# After running `pip install -r requirements.txt` verify with:
+#   python -c "import sarvamai; print(sarvamai.__version__)"
+# and confirm it is >= 0.1.30.
+
+# --- Core orchestration ---
+pipecat-ai[sarvam,cartesia,anthropic,silero,webrtc]>=0.0.60,<1.0.0
+
+# Override sarvamai to a version that supports saaras:v3 mode/prompt
+# (resolves pipecat issue #3783 — remove this line once pipecat pins >=0.1.30)
+sarvamai>=0.1.30
+
+# --- Web framework + server ---
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.30.0,<1.0.0
+
+# --- Database ---
+supabase>=2.9.0,<3.0.0
+
+# --- Utilities ---
+python-dotenv>=1.0.0,<2.0.0
+aiohttp>=3.10.0,<4.0.0
+pydantic>=2.8.0,<3.0.0

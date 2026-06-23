@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aria — Brigade Gateway</title>
+  <style>
+    /* ── Custom properties ── */
+    :root {
+      --bg:        #f7f5f2;
+      --surface:   #ffffff;
+      --border:    #e4dfd8;
+      --text:      #1a1714;
+      --muted:     #6b6460;
+      --accent:    #0d9488;
+      --accent-dk: #0f766e;
+      --accent-lt: #ccfbf1;
+      --danger:    #dc2626;
+      --radius:    14px;
+      --shadow:    0 4px 24px rgba(0,0,0,.10);
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:        #111110;
+        --surface:   #1c1b1a;
+        --border:    #2e2c2a;
+        --text:      #edeae6;
+        --muted:     #9c9490;
+        --accent:    #14b8a6;
+        --accent-dk: #0d9488;
+        --accent-lt: #0d3330;
+        --danger:    #f87171;
+        --shadow:    0 4px 32px rgba(0,0,0,.40);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 420px;
+      padding: 2.5rem 2rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* ── Header ── */
+    .card-header { text-align: center; }
+
+    .logo-ring {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--accent-lt);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    .logo-ring.live::before {
+      content: '';
+      position: absolute;
+      inset: -7px;
+      border-radius: 50%;
+      border: 3px solid var(--accent);
+      animation: pulse-ring 1.6s cubic-bezier(.4,0,.6,1) infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%   { opacity: 1;   transform: scale(1);    }
+      70%  { opacity: 0;   transform: scale(1.35); }
+      100% { opacity: 0;   transform: scale(1.35); }
+    }
+
+    .logo-ring svg {
+      width: 38px;
+      height: 38px;
+      color: var(--accent);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .subtitle {
+      font-size: .875rem;
+      color: var(--muted);
+      margin-top: .25rem;
+    }
+
+    /* ── Status row ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      font-size: .8125rem;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+
+    .status-dot.connecting { background: #f59e0b; animation: blink 1s step-start infinite; }
+    .status-dot.live       { background: var(--accent); }
+    .status-dot.ended      { background: var(--danger); }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── CTA Button ── */
+    .cta-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .625rem;
+      width: 100%;
+      padding: .9rem 1.5rem;
+      border-radius: 9999px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background .2s, transform .1s, box-shadow .2s;
+      outline-offset: 3px;
+    }
+
+    .cta-btn.start {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(13,148,136,.35);
+    }
+    .cta-btn.start:hover  { background: var(--accent-dk); box-shadow: 0 4px 18px rgba(13,148,136,.45); }
+    .cta-btn.start:active { transform: scale(.97); }
+
+    .cta-btn.end {
+      background: transparent;
+      border: 2px solid var(--danger);
+      color: var(--danger);
+    }
+    .cta-btn.end:hover  { background: rgba(220,38,38,.08); }
+    .cta-btn.end:active { transform: scale(.97); }
+
+    .cta-btn:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* ── Error banner ── */
+    .error-banner {
+      display: none;
+      background: rgba(220,38,38,.08);
+      border: 1px solid rgba(220,38,38,.3);
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      font-size: .8125rem;
+      color: var(--danger);
+      line-height: 1.5;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ── Transcript panel ── */
+    .transcript-wrap {
+      display: none;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .transcript-wrap.visible { display: flex; }
+
+    .transcript-label {
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+    }
+
+    .transcript-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .75rem 1rem;
+      min-height: 80px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: .8125rem;
+      line-height: 1.6;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .transcript-box p         { margin: 0; padding: .1rem 0; }
+    .transcript-box p.partial { color: var(--muted); font-style: italic; }
+
+    /* ── Footer ── */
+    .footer-note {
+      text-align: center;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="main">
+
+    <!-- Header -->
+    <div class="card-header">
+      <div class="logo-ring" id="logoRing" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="11" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <line x1="8"  y1="21" x2="16" y2="21"/>
+        </svg>
+      </div>
+      <h1>Aria — Brigade Gateway</h1>
+      <p class="subtitle">AI pre-sales consultant</p>
+    </div>
+
+    <!-- Status -->
+    <div class="status-row" role="status" aria-live="polite">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Idle — press the button to begin</span>
+    </div>
+
+    <!-- Error banner -->
+    <div class="error-banner" id="errorBanner" role="alert"></div>
+
+    <!-- CTA -->
+    <button class="cta-btn start" id="callBtn" aria-label="Talk to Aria"></button>
+
+    <!-- Transcript (shown only when data arrives) -->
+    <div class="transcript-wrap" id="transcriptWrap" aria-live="polite" aria-label="Live transcript">
+      <span class="transcript-label">Live transcript</span>
+      <div class="transcript-box" id="transcriptBox"></div>
+    </div>
+
+    <p class="footer-note">Your voice is processed securely in real-time.</p>
+  </div>
+
+  <!-- Remote audio playback -->
+  <audio id="remoteAudio" autoplay playsinline style="display:none"></audio>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── DOM ── */
+  const callBtn        = document.getElementById('callBtn');
+  const statusDot      = document.getElementById('statusDot');
+  const statusText     = document.getElementById('statusText');
+  const errorBanner    = document.getElementById('errorBanner');
+  const logoRing       = document.getElementById('logoRing');
+  const remoteAudio    = document.getElementById('remoteAudio');
+  const transcriptWrap = document.getElementById('transcriptWrap');
+  const transcriptBox  = document.getElementById('transcriptBox');
+
+  /* ── Runtime state ── */
+  var pc          = null;
+  var localStream = null;
+  var pcId        = null;
+  var callActive  = false;
+  var partialP    = null;   // current <p class="partial"> element, if any
+
+  /* ── Icon SVG strings ── */
+  var ICON_PHONE =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.61 19' +
+    ' a19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-2.92-8.19A2 2 0 0 1 4.68 2h3' +
+    ' a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91' +
+    ' a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7' +
+    ' A2 2 0 0 1 22 16.92z"/></svg>';
+
+  var ICON_HANGUP =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<line x1="1" y1="1" x2="23" y2="23"/>' +
+    '<path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55' +
+    ' M5 5a10.9 10.9 0 0 0-1.29 5 11 11 0 0 0 4 8.13' +
+    ' M10.59 13.31a16 16 0 0 0 4.1 2.6l1.27-1.27' +
+    ' a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7' +
+    ' A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2' +
+    ' A19.79 19.79 0 0 1 11.61 19"/></svg>';
+
+  var ICON_SPIN =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' +
+    ' style="animation:spin .85s linear infinite">' +
+    '<circle cx="12" cy="12" r="10" stroke-opacity=".25"/>' +
+    '<path d="M12 2a10 10 0 0 1 10 10"/></svg>';
+
+  /* ── Utilities ── */
+  function getLang() {
+    var v = (new URLSearchParams(window.location.search).get('lang') || 'en').toLowerCase();
+    return ['en', 'hi', 'te'].includes(v) ? v : 'en';
+  }
+
+  function setStatus(state, text) {
+    statusDot.className = 'status-dot' + (state ? ' ' + state : '');
+    statusText.textContent = text;
+    logoRing.classList.toggle('live', state === 'live');
+  }
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.classList.add('visible');
+  }
+
+  function clearError() {
+    errorBanner.textContent = '';
+    errorBanner.classList.remove('visible');
+  }
+
+  function setBtnMode(mode) {
+    // mode: 'start' | 'busy' | 'end'
+    callBtn.className = 'cta-btn ' + (mode === 'end' ? 'end' : 'start');
+    callBtn.disabled  = (mode === 'busy');
+    if (mode === 'start') {
+      callBtn.innerHTML = ICON_PHONE + ' Talk to Aria';
+      callBtn.setAttribute('aria-label', 'Talk to Aria');
+    } else if (mode === 'busy') {
+      callBtn.innerHTML = ICON_SPIN  + ' Connecting…';
+      callBtn.setAttribute('aria-label', 'Connecting');
+    } else {
+      callBtn.innerHTML = ICON_HANGUP + ' End call';
+      callBtn.setAttribute('aria-label', 'End call');
+    }
+  }
+
+  /* ── Transcript ── */
+  function handleDataMessage(evt) {
+    var raw = evt.data;
+    var text, isPartial;
+    try {
+      var obj = JSON.parse(raw);
+      text      = obj.text || obj.transcript || String(raw);
+      isPartial = !!(obj.partial || obj.is_partial);
+    } catch (_) {
+      text      = (typeof raw === 'string') ? raw.trim() : '';
+      isPartial = false;
+    }
+    if (!text) return;
+
+    transcriptWrap.classList.add('visible');
+    if (isPartial) {
+      if (!partialP) {
+        partialP = document.createElement('p');
+        partialP.className = 'partial';
+        transcriptBox.appendChild(partialP);
+      }
+      partialP.textContent = text;
+    } else {
+      if (partialP) {
+        partialP.className = '';
+        partialP.textContent = text;
+        partialP = null;
+      } else {
+        var p = document.createElement('p');
+        p.textContent = text;
+        transcriptBox.appendChild(p);
+      }
+    }
+    transcriptBox.scrollTop = transcriptBox.scrollHeight;
+  }
+
+  function wireDataChannel(ch) {
+    ch.onmessage = handleDataMessage;
+    ch.onerror   = function () {};  // ignore silently
+  }
+
+  /* ── ICE gathering wait ── */
+  function waitForIceGathering(conn, timeoutMs) {
+    return new Promise(function (resolve) {
+      if (conn.iceGatheringState === 'complete') { resolve(); return; }
+      var timer = setTimeout(resolve, timeoutMs || 5000);
+      conn.addEventListener('icegatheringstatechange', function handler() {
+        if (conn.iceGatheringState === 'complete') {
+          clearTimeout(timer);
+          conn.removeEventListener('icegatheringstatechange', handler);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /* ── Teardown ── */
+  function teardown() {
+    callActive = false;
+    partialP   = null;
+
+    if (localStream) {
+      localStream.getTracks().forEach(function (t) { t.stop(); });
+      localStream = null;
+    }
+    if (pc) {
+      pc.oniceconnectionstatechange = null;
+      pc.ontrack = null;
+      pc.ondatachannel = null;
+      try { pc.close(); } catch (_) {}
+      pc = null;
+    }
+    remoteAudio.srcObject = null;
+    setStatus('ended', 'Call ended');
+    setBtnMode('start');
+  }
+
+  /* ── Start call ── */
+  async function startCall() {
+    clearError();
+    setBtnMode('busy');
+    setStatus('connecting', 'Requesting microphone…');
+
+    /* 1. Mic */
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch (err) {
+      var msg = (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')
+        ? 'Microphone permission denied. Please allow access and try again.'
+        : 'Could not access microphone: ' + err.message;
+      showError(msg);
+      setStatus('idle', 'Idle — press the button to begin');
+      setBtnMode('start');
+      return;
+    }
+
+    /* 2. PeerConnection */
+    pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    /* 3. Mic tracks */
+    localStream.getTracks().forEach(function (t) { pc.addTrack(t, localStream); });
+
+    /* 4. sendrecv audio transceiver */
+    pc.addTransceiver('audio', { direction: 'sendrecv' });
+
+    /* 5. Remote audio */
+    pc.ontrack = function (evt) {
+      if (evt.streams && evt.streams[0]) {
+        remoteAudio.srcObject = evt.streams[0];
+      }
+    };
+
+    /* 6. Data channel — client-initiated */
+    try {
+      wireDataChannel(pc.createDataChannel('transcript'));
+    } catch (_) {}
+
+    /* 7. Data channel — server-initiated */
+    pc.ondatachannel = function (evt) { wireDataChannel(evt.channel); };
+
+    /* 8. ICE state */
+    pc.oniceconnectionstatechange = function () {
+      var s = pc ? pc.iceConnectionState : 'closed';
+      if (s === 'checking') {
+        setStatus('connecting', 'Establishing connection…');
+      } else if (s === 'connected' || s === 'completed') {
+        callActive = true;
+        setStatus('live', 'Live — speak now');
+        setBtnMode('end');
+      } else if (s === 'disconnected') {
+        setStatus('connecting', 'Reconnecting…');
+      } else if (s === 'failed') {
+        showError('WebRTC connection failed. Please try again.');
+        teardown();
+      } else if (s === 'closed' && callActive) {
+        teardown();
+      }
+    };
+
+    /* 9. Offer */
+    setStatus('connecting', 'Creating SDP offer…');
+    try {
+      var offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+    } catch (err) {
+      showError('Failed to create offer: ' + err.message);
+      teardown();
+      return;
+    }
+
+    /* 10. Wait for ICE candidates */
+    setStatus('connecting', 'Gathering ICE candidates…');
+    await waitForIceGathering(pc, 5000);
+
+    /* 11. POST /api/offer */
+    setStatus('connecting', 'Signaling with server…');
+    var answer;
+    try {
+      var resp = await fetch('/api/offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sdp:   pc.localDescription.sdp,
+          type:  pc.localDescription.type,
+          pc_id: pcId,
+          lang:  getLang()
+        })
+      });
+      if (!resp.ok) {
+        var body = await resp.text().catch(function () { return ''; });
+        throw new Error('Server error ' + resp.status + (body ? ': ' + body : ''));
+      }
+      answer = await resp.json();
+    } catch (err) {
+      showError('Signaling failed: ' + err.message);
+      teardown();
+      return;
+    }
+
+    /* 12. Remote description */
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription({ sdp: answer.sdp, type: answer.type }));
+      if (answer.pc_id) pcId = answer.pc_id;
+    } catch (err) {
+      showError('Failed to apply server answer: ' + err.message);
+      teardown();
+      return;
+    }
+
+    setStatus('connecting', 'Waiting for ICE to connect…');
+    // ICE state handler will flip us to 'live' once connected.
+  }
+
+  /* ── Button ── */
+  callBtn.addEventListener('click', function () {
+    if (callActive || (pc && pc.iceConnectionState !== 'closed')) {
+      teardown();
+    } else {
+      startCall();
+    }
+  });
+
+  /* ── Init ── */
+  setStatus('idle', 'Idle — press the button to begin');
+  setBtnMode('start');
+
+}());
+</script>
+</body>
+</html>
