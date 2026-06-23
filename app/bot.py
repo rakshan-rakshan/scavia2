@@ -21,7 +21,7 @@ import logging
 from app.config import LANGUAGE_NAMES, get_settings
 from app.system_prompt import build_system_prompt
 from app.tools import SessionState, build_tools_schema, register_tools
-from app.transports import create_stt_service, create_tts_service
+from app.transports import create_llm_service, create_stt_service, create_tts_service
 
 logger = logging.getLogger("aria.bot")
 
@@ -49,9 +49,8 @@ def build_pipeline(
     from pipecat.pipeline.pipeline import Pipeline
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-    from pipecat.services.anthropic.llm import AnthropicLLMService
 
-    settings = get_settings()
+    get_settings()  # validate provider config early
     state = SessionState(channel=channel, current_language=start_lang)
     state.language_path.append(LANGUAGE_NAMES.get(start_lang, "english"))
 
@@ -61,9 +60,7 @@ def build_pipeline(
     if tts is None:
         tts = create_tts_service(start_lang)
     if llm is None:
-        llm = AnthropicLLMService(
-            api_key=settings.anthropic_api_key, model=settings.anthropic_model
-        )
+        llm = create_llm_service()
 
     # --- Context (system prompt + tools) ---
     messages = [{"role": "system", "content": build_system_prompt(start_lang)}]

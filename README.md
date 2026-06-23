@@ -4,25 +4,28 @@ A self-hosted multilingual AI voice agent that qualifies real-estate leads over 
 
 ---
 
-## ⚡ Test it in 5 minutes (Docker)
+## ⚡ Run it in 5 minutes (Docker, cheap stack)
 
-You only need **two** keys to hear Aria talk: an Anthropic key and a Sarvam key.
-No Cartesia, no Supabase, no database setup.
+You only need **two** keys to talk to Aria — a cheap **OpenRouter** LLM key and a
+**Sarvam** key (STT + voice). No Anthropic, no Cartesia, no Supabase, no DB.
 
 ```bash
 cp .env.example .env
 # edit .env — set just these two:
-#   ANTHROPIC_API_KEY=sk-ant-...
+#   OPENROUTER_API_KEY=sk-or-...   (get one at openrouter.ai; ~$5 lasts a long time)
 #   SARVAM_API_KEY=...
+# (LLM_PROVIDER defaults to openrouter, LLM_MODEL to openai/gpt-4o-mini — change freely)
 
 docker compose up --build
 # open http://localhost:7860  →  click "Talk to Aria", allow the mic
 ```
 
-That's it. In this **demo mode**: English voice uses Sarvam (skip Cartesia), and
-captured leads are *logged to the console* instead of saved to a DB (skip
-Supabase). To go full production, fill in the rest of `.env` and apply
-`db/schema.sql` (see "Local Setup" below).
+That's it. In this **demo mode**: the LLM is whatever cheap OpenRouter model you
+pick, English voice uses Sarvam (skip Cartesia), and captured leads are *logged
+to the console* instead of saved to a DB (skip Supabase). To upgrade: add a
+`CARTESIA_API_KEY`+`CARTESIA_VOICE_ID` for premium English voice, and
+`SUPABASE_*` + `db/schema.sql` for real lead capture. To swap the LLM provider,
+set `LLM_PROVIDER=openai` or `anthropic`.
 
 > Mic note: browsers only allow microphone access on `localhost` or HTTPS — so
 > `http://localhost:7860` works locally; a remote deployment needs TLS.

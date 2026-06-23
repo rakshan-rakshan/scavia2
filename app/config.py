@@ -40,9 +40,23 @@ SARVAM_TTS_LANG_CODE = {"hi": "hi-IN", "te": "te-IN", "en": "en-IN"}
 
 @dataclass(frozen=True)
 class Settings:
-    # LLM (D4)
-    anthropic_api_key: str = field(default_factory=lambda: _req("ANTHROPIC_API_KEY"))
-    # Per D4: Sonnet for live calls (latency/cost); escalate to Opus only if quality demands.
+    # --- LLM ---------------------------------------------------------------
+    # Provider-flexible. Default = OpenRouter (cheap, any model, OpenAI-compatible).
+    #   LLM_PROVIDER=openrouter  -> OPENROUTER_API_KEY + LLM_MODEL (e.g. openai/gpt-4o-mini)
+    #   LLM_PROVIDER=openai      -> OPENAI_API_KEY     + LLM_MODEL (e.g. gpt-4o-mini)
+    #   LLM_PROVIDER=anthropic   -> ANTHROPIC_API_KEY  + ANTHROPIC_MODEL
+    llm_provider: str = field(default_factory=lambda: _opt("LLM_PROVIDER", "openrouter").lower())
+    # OpenAI-compatible key (OpenRouter or OpenAI). OPENROUTER_API_KEY wins if both set.
+    llm_api_key: str = field(
+        default_factory=lambda: _opt("OPENROUTER_API_KEY") or _opt("OPENAI_API_KEY")
+    )
+    llm_model: str = field(default_factory=lambda: _opt("LLM_MODEL", "openai/gpt-4o-mini"))
+    llm_base_url: str = field(
+        default_factory=lambda: _opt("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+    )
+
+    # Anthropic — OPTIONAL fallback provider (only used when LLM_PROVIDER=anthropic).
+    anthropic_api_key: str = field(default_factory=lambda: _opt("ANTHROPIC_API_KEY", ""))
     anthropic_model: str = field(default_factory=lambda: _opt("ANTHROPIC_MODEL", "claude-sonnet-4-6"))
 
     # STT (D2) — Sarvam saaras:v3, transcribe mode, auto-detect.
@@ -85,8 +99,34 @@ class Settings:
     def acefone_enabled(self) -> bool:
         return bool(self.acefone_api_token)
 
+    def uses_anthropic(self) -> bool:
+        return self.llm_provider == "anthropic"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Cached singleton. First call validates required env vars."""
-    return Settings()
+    """Cached singleton. First call validates required env vars (provider-aware)."""
+    s = Settings()
+
+    # STT/TTS always need Sarvam (STT + the Indic/English fallback voice).
+    if not s.sarvam_api_key:
+        raise RuntimeError(
+            "Missing SARVAM_API_KEY. Copy .env.example to .env and fill it (needed for STT)."
+        )
+
+    # LLM credentials depend on the selected provider.
+    if s.llm_provider in ("openrouter", "openai"):
+        if not s.llm_api_key:
+            raise RuntimeError(
+                f"LLM_PROVIDER={s.llm_provider} but no key set. "
+                "Set OPENROUTER_API_KEY (recommended) or OPENAI_API_KEY in .env."
+            )
+    elif s.llm_provider == "anthropic":
+        if not s.anthropic_api_key:
+            raise RuntimeError("LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is not set.")
+    else:
+        raise RuntimeError(
+            f"Unknown LLM_PROVIDER={s.llm_provider!r}. Use 'openrouter', 'openai', or 'anthropic'."
+        )
+
+    return s

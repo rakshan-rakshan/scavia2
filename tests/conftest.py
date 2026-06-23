@@ -25,6 +25,8 @@ import pytest
 # 1. Dummy env vars — must be set BEFORE app.config or app.tools is imported.
 # ---------------------------------------------------------------------------
 _DUMMY_ENV = {
+    "LLM_PROVIDER": "openrouter",
+    "OPENROUTER_API_KEY": "test-openrouter-key",
     "ANTHROPIC_API_KEY": "test-anthropic-key",
     "SARVAM_API_KEY": "test-sarvam-key",
     "CARTESIA_API_KEY": "test-cartesia-key",

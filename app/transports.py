@@ -43,6 +43,30 @@ def create_tts_service(lang: str):
     )
 
 
+def create_llm_service():
+    """Return the LLM service for the configured provider (D4).
+
+    Default is OpenRouter (cheap, OpenAI-compatible — any model). Falls back to
+    Anthropic only when LLM_PROVIDER=anthropic. All three share the same pipecat
+    OpenAI/Anthropic service API, so the rest of the pipeline is unchanged.
+    """
+    s = get_settings()
+
+    if s.uses_anthropic():
+        from pipecat.services.anthropic.llm import AnthropicLLMService
+
+        return AnthropicLLMService(api_key=s.anthropic_api_key, model=s.anthropic_model)
+
+    # openrouter / openai (both OpenAI-compatible)
+    from pipecat.services.openai.llm import OpenAILLMService
+
+    return OpenAILLMService(
+        api_key=s.llm_api_key,
+        base_url=s.llm_base_url,
+        model=s.llm_model,
+    )
+
+
 def create_stt_service():
     """Sarvam saaras:v3 in transcribe mode with auto language detection (D2)."""
     from pipecat.services.sarvam.stt import SarvamSTTService
