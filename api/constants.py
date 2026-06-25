@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -155,3 +156,36 @@ OSS_JWT_SECRET = os.getenv("OSS_JWT_SECRET", "change-me-in-production")
 OSS_JWT_EXPIRY_HOURS = int(os.getenv("OSS_JWT_EXPIRY_HOURS", "720"))  # 30 days
 
 TUNER_BASE_URL = os.getenv("TUNER_BASE_URL", "https://api.usetuner.ai")
+
+
+# ---------------------------------------------------------------------------
+# TTS pronunciation overrides (spoken output only; never affects chat text)
+# ---------------------------------------------------------------------------
+# Brand/proper nouns that TTS engines mispronounce. Applied as whole-word,
+# case-insensitive replacements on the synthesis path, after sentence
+# aggregation (see api/services/pipecat/pronunciation_filter.py). Two profiles
+# because English engines and Indian-language engines (Sarvam) need different
+# respellings to land the same sound:
+#   - default: English engines (Cartesia, Deepgram, ...) -> Latin respelling.
+#     "Brigade" -> "Brigaid" so it is spoken "bri-GAYD" (rhymes with "parade").
+#   - indic:   Sarvam's Telugu/Hindi voice reads native script reliably, so
+#     "Brigade" -> Telugu "బ్రిగేడ్".
+# Either profile can be overridden with a JSON env var (no code change needed),
+# e.g. TTS_PRONUNCIATION_OVERRIDES='{"Brigade": "Brigayd"}'.
+def _load_json_map(env_name: str, default: dict) -> dict:
+    raw = os.getenv(env_name, "").strip()
+    if not raw:
+        return default
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else default
+    except Exception:
+        return default
+
+
+TTS_PRONUNCIATION_OVERRIDES = _load_json_map(
+    "TTS_PRONUNCIATION_OVERRIDES", {"Brigade": "Brigaid"}
+)
+TTS_PRONUNCIATION_OVERRIDES_INDIC = _load_json_map(
+    "TTS_PRONUNCIATION_OVERRIDES_INDIC", {"Brigade": "బ్రిగేడ్"}
+)

@@ -4,9 +4,14 @@ import aiohttp
 from fastapi import HTTPException
 from loguru import logger
 
-from api.constants import MPS_API_URL
+from api.constants import (
+    MPS_API_URL,
+    TTS_PRONUNCIATION_OVERRIDES,
+    TTS_PRONUNCIATION_OVERRIDES_INDIC,
+)
 from api.services.configuration.registry import ServiceProviders
 from api.services.pipecat.minimax_tts import MiniMaxOwnedSessionTTSService
+from api.services.pipecat.pronunciation_filter import PronunciationTextFilter
 from api.utils.url_security import validate_user_configured_service_url
 from pipecat.services.assemblyai.stt import AssemblyAISTTService, AssemblyAISTTSettings
 from pipecat.services.aws.llm import AWSBedrockLLMService, AWSBedrockLLMSettings
@@ -274,11 +279,24 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
     )
     # Create function call filter to prevent TTS from speaking function call tags
     xml_function_tag_filter = XMLFunctionTagFilter()
+    # Phonetic respelling for mispronounced brand/proper nouns (spoken output
+    # only; never affects chat). Sarvam's Indian-language voice reads native
+    # script reliably, so it gets the Indic profile; all other engines get the
+    # Latin profile. Pronunciation runs first so it sees the full aggregated
+    # sentence before the XML filter does any tag buffering.
+    _pron_map = (
+        TTS_PRONUNCIATION_OVERRIDES_INDIC
+        if user_config.tts.provider == ServiceProviders.SARVAM.value
+        else TTS_PRONUNCIATION_OVERRIDES
+    )
+    tts_text_filters = (
+        [PronunciationTextFilter(_pron_map)] if _pron_map else []
+    ) + [xml_function_tag_filter]
     if user_config.tts.provider == ServiceProviders.DEEPGRAM.value:
         return DeepgramTTSService(
             api_key=user_config.tts.api_key,
             settings=DeepgramTTSSettings(voice=user_config.tts.voice),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -286,7 +304,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
         return OpenAITTSService(
             api_key=user_config.tts.api_key,
             settings=OpenAITTSSettings(model=user_config.tts.model),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -310,7 +328,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
             credentials=credentials,
             location=location,
             settings=GoogleTTSSettings(**settings_kwargs),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -338,7 +356,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                 speed=user_config.tts.speed,
                 similarity_boost=0.75,
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -364,7 +382,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                     else {}
                 ),
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -379,7 +397,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                 voice=user_config.tts.voice,
                 speed=user_config.tts.speed,
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -392,7 +410,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
             api_key=user_config.tts.api_key,
             voice_id=voice_id,
             model=user_config.tts.model,
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
         )
         # Set language directly as BCP-47 code (bypasses Language enum conversion)
@@ -408,7 +426,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                 voice=user_config.tts.voice,
                 speed=user_config.tts.speed,
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -433,7 +451,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
         return RimeTTSService(
             api_key=user_config.tts.api_key,
             settings=RimeTTSSettings(**settings_kwargs),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -463,7 +481,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                 voice=voice,
                 language=pipecat_language,
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
@@ -498,7 +516,7 @@ def create_tts_service(user_config, audio_config: "AudioConfig"):
                 voice=voice,
                 speed=speed,
             ),
-            text_filters=[xml_function_tag_filter],
+            text_filters=tts_text_filters,
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
