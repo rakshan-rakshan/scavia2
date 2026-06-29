@@ -416,13 +416,15 @@ class AcefoneProvider(TelephonyProvider):
         """
         Generate Acefone response for an inbound webhook.
 
-        Acefone expects a JSON response with action and url for the stream.
+        Acefone Voice Streaming requires a strict envelope — exactly the keys
+        ``success`` and ``wss_url`` (no others), HTTP 200, valid JSON. Any other
+        shape causes the platform to decline and hang up the call.
         """
         from fastapi import Response
 
         response_data = {
-            "action": "stream",
-            "url": websocket_url,
+            "success": True,
+            "wss_url": websocket_url,
         }
 
         return Response(

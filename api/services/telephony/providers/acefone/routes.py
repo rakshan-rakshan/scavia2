@@ -1,9 +1,15 @@
 """Acefone webhook and endpoint routes."""
 
-import json
+import uuid
+from typing import Any, Dict
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from loguru import logger
+
+from api.db import db_client
+from api.enums import CallType, WorkflowRunMode
+from api.utils.common import get_backend_endpoints
 
 router = APIRouter()
 
@@ -19,21 +25,120 @@ async def handle_acefone_webhook(request: Request):
     return {"status": "ok"}
 
 
+def _truthy(value: Any) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+async def build_dynamic_endpoint_response(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve an inbound Acefone Voice-Streaming call to a per-call WS URL.
+
+    Acefone's Dynamic endpoint sends the predefined params
+    ``callId``/``fromNumber``/``toNumber``/``status`` plus any custom key/value
+    pairs configured on the endpoint. We require a ``workflow_id`` custom param
+    (the bot to run); optional ``use_draft`` runs the draft definition (for
+    pre-publish voice validation) and optional ``telephony_configuration_id``
+    selects a specific Acefone config when the org has several.
+
+    Creates an INITIALIZED inbound workflow run and returns the strict envelope
+    Acefone requires: ``{"success": true, "wss_url": "wss://..."}`` and nothing
+    else. Raises ``ValueError`` when the call can't be resolved (the route turns
+    that into a non-200 so the platform hangs up cleanly).
+    """
+    call_id = params.get("callId") or params.get("call_id") or ""
+    from_number = params.get("fromNumber") or params.get("from") or ""
+    to_number = params.get("toNumber") or params.get("to") or ""
+
+    raw_workflow_id = params.get("workflow_id") or params.get("workflowId")
+    if not raw_workflow_id:
+        raise ValueError(
+            "Acefone dynamic endpoint requires a 'workflow_id' custom parameter"
+        )
+    workflow_id = int(raw_workflow_id)
+
+    workflow = await db_client.get_workflow_by_id(workflow_id)
+    if not workflow:
+        raise ValueError(f"Workflow {workflow_id} not found")
+
+    user_id = workflow.user_id
+    organization_id = workflow.organization_id
+
+    # The run must carry a telephony_configuration_id so the WS handler can load
+    # Acefone credentials (get_telephony_provider_for_run). Without an Acefone
+    # config the handler would fall back to the org default and reject the call
+    # with a provider mismatch.
+    configs = await db_client.list_telephony_configurations_by_provider(
+        organization_id, WorkflowRunMode.ACEFONE.value
+    )
+    if not configs:
+        raise ValueError(
+            f"No Acefone telephony configuration for org {organization_id}"
+        )
+
+    telephony_configuration_id = configs[0].id
+    override_cfg = params.get("telephony_configuration_id")
+    if override_cfg:
+        try:
+            wanted = int(override_cfg)
+            telephony_configuration_id = next(
+                (c.id for c in configs if c.id == wanted),
+                telephony_configuration_id,
+            )
+        except (TypeError, ValueError):
+            pass
+
+    use_draft = _truthy(params.get("use_draft", False))
+
+    numeric_suffix = int(str(uuid.uuid4()).replace("-", "")[:8], 16) % 100000000
+    run = await db_client.create_workflow_run(
+        f"WR-TEL-IN-{numeric_suffix:08d}",
+        workflow_id,
+        WorkflowRunMode.ACEFONE.value,
+        user_id=user_id,
+        call_type=CallType.INBOUND,
+        use_draft=use_draft,
+        initial_context={
+            "caller_number": from_number,
+            "called_number": to_number,
+            "direction": "inbound",
+            "provider": WorkflowRunMode.ACEFONE.value,
+            "telephony_configuration_id": telephony_configuration_id,
+        },
+        gathered_context={"call_id": call_id},
+        logs={"acefone_dynamic_endpoint": params},
+    )
+
+    _, wss_backend_endpoint = await get_backend_endpoints()
+    wss_url = (
+        f"{wss_backend_endpoint}/api/v1/telephony/ws/"
+        f"{workflow_id}/{user_id}/{run.id}"
+    )
+    logger.info(
+        f"Acefone dynamic endpoint -> run {run.id} "
+        f"(workflow={workflow_id}, use_draft={use_draft}) wss={wss_url}"
+    )
+    return {"success": True, "wss_url": wss_url}
+
+
 @router.post("/acefone/dynamic-endpoint", include_in_schema=False)
 async def handle_acefone_dynamic_endpoint(request: Request):
-    """Acefone Dynamic Endpoint resolver.
+    """Acefone Voice-Streaming Dynamic Endpoint resolver.
 
-    Acefone calls this with callId, fromNumber, toNumber, etc.
-    Must return ``{"success": true, "wss_url": "wss://..."}``.
+    Returns ``{"success": true, "wss_url": "wss://..."}`` (HTTP 200, exactly
+    those keys, < 2000 ms) or a non-200 to make Acefone decline and hang up.
     """
     try:
-        data = await request.json()
+        body = await request.json()
+        if not isinstance(body, dict):
+            body = {}
     except Exception:
-        data = await request.body()
-        data = {}
+        body = {}
 
-    logger.info(f"Acefone dynamic endpoint request: {data}")
+    params: Dict[str, Any] = {**dict(request.query_params), **body}
+    logger.info(f"Acefone dynamic endpoint request: {params}")
 
-    wss_url = f"wss://{request.url.hostname}/api/v1/telephony/acefone/stream"
-
-    return {"success": True, "wss_url": wss_url}
+    try:
+        return await build_dynamic_endpoint_response(params)
+    except Exception as e:
+        logger.error(f"Acefone dynamic endpoint failed: {e}")
+        # Non-200 → Acefone declines and hangs up (per the strict contract).
+        return JSONResponse(status_code=502, content={"error": str(e)})
