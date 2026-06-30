@@ -77,9 +77,12 @@ async def test_dynamic_endpoint_returns_strict_envelope():
         patch.stopall()
 
     # Strict contract: HTTP 200, exactly {success, wss_url}, nothing else.
+    # wss host is derived from the request host (example.test in this scope),
+    # not BACKEND_API_ENDPOINT, so the URL Acefone receives matches the cert
+    # of the domain it dialed.
     assert result == {
         "success": True,
-        "wss_url": "wss://maira.test/api/v1/telephony/ws/12/1/999",
+        "wss_url": "wss://example.test/api/v1/telephony/ws/12/1/999",
     }
     assert set(result.keys()) == {"success", "wss_url"}
 
@@ -149,5 +152,5 @@ async def test_build_response_reads_query_string_fallback():
 
     assert result == {
         "success": True,
-        "wss_url": "wss://maira.test/api/v1/telephony/ws/12/1/999",
+        "wss_url": "wss://example.test/api/v1/telephony/ws/12/1/999",
     }

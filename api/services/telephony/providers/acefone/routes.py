@@ -1,7 +1,7 @@
 """Acefone webhook and endpoint routes."""
 
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -29,7 +29,9 @@ def _truthy(value: Any) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
 
 
-async def build_dynamic_endpoint_response(params: Dict[str, Any]) -> Dict[str, Any]:
+async def build_dynamic_endpoint_response(
+    params: Dict[str, Any], request_host: Optional[str] = None
+) -> Dict[str, Any]:
     """Resolve an inbound Acefone Voice-Streaming call to a per-call WS URL.
 
     Acefone's Dynamic endpoint sends the predefined params
@@ -107,11 +109,17 @@ async def build_dynamic_endpoint_response(params: Dict[str, Any]) -> Dict[str, A
         logs={"acefone_dynamic_endpoint": params},
     )
 
-    _, wss_backend_endpoint = await get_backend_endpoints()
-    wss_url = (
-        f"{wss_backend_endpoint}/api/v1/telephony/ws/"
-        f"{workflow_id}/{user_id}/{run.id}"
-    )
+    # Build the WS URL on the SAME host Acefone dialed (request_host) so the
+    # TLS cert matches. Acefone's WS client verifies TLS; deriving the host
+    # from BACKEND_API_ENDPOINT can hand back a bare-IP/self-signed origin it
+    # cannot connect to (prod serves the API behind a real domain via nginx
+    # but BACKEND_API_ENDPOINT may be the IP). Fall back to BACKEND_API_ENDPOINT
+    # when there is no request host (internal callers / tests).
+    if request_host:
+        wss_base = f"wss://{request_host}"
+    else:
+        _, wss_base = await get_backend_endpoints()
+    wss_url = f"{wss_base}/api/v1/telephony/ws/{workflow_id}/{user_id}/{run.id}"
     logger.info(
         f"Acefone dynamic endpoint -> run {run.id} "
         f"(workflow={workflow_id}, use_draft={use_draft}) wss={wss_url}"
@@ -137,7 +145,9 @@ async def handle_acefone_dynamic_endpoint(request: Request):
     logger.info(f"Acefone dynamic endpoint request: {params}")
 
     try:
-        return await build_dynamic_endpoint_response(params)
+        return await build_dynamic_endpoint_response(
+            params, request_host=request.url.hostname
+        )
     except Exception as e:
         logger.error(f"Acefone dynamic endpoint failed: {e}")
         # Non-200 → Acefone declines and hangs up (per the strict contract).
