@@ -5,6 +5,7 @@ from loguru import logger
 from pipecat.utils.run_context import set_current_run_id
 
 from api.db import db_client
+from api.services.lead_delivery import deliver_lead_for_run, log_call_to_supabase
 from api.services.pricing.workflow_run_cost import calculate_workflow_run_cost
 from api.services.storage import get_current_storage_backend, storage_fs
 from api.tasks.run_integrations import run_integrations_post_workflow_run
@@ -95,6 +96,18 @@ async def process_workflow_completion(
 
     storage_backend = get_current_storage_backend()
 
+    # Capture transcript text before Step 2 uploads + deletes the temp file, so
+    # the lead-delivery step (Step 5) can include it without re-fetching from S3.
+    transcript_text: Optional[str] = None
+    if transcript_temp_path and os.path.exists(transcript_temp_path):
+        try:
+            with open(transcript_temp_path, "r", encoding="utf-8") as f:
+                transcript_text = f.read()
+        except Exception as e:
+            logger.warning(
+                f"Could not read transcript for lead delivery (run {workflow_run_id}): {e}"
+            )
+
     # Step 1: Upload audio if provided
     if audio_temp_path:
         try:
@@ -174,5 +187,21 @@ async def process_workflow_completion(
         await calculate_workflow_run_cost(workflow_run_id)
     except Exception as e:
         logger.error(f"Error calculating cost for workflow {workflow_run_id}: {e}")
+
+    # Step 5a: Log every call to the Supabase CRM regardless of outcome.
+    # Gated by SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + workflow allowlist;
+    # a no-op when not configured. Best-effort, fully exception-guarded.
+    try:
+        await log_call_to_supabase(workflow_run_id, transcript=transcript_text)
+    except Exception as e:
+        logger.error(f"Error logging call to Supabase for workflow {workflow_run_id}: {e}")
+
+    # Step 5b: Deliver to the Google Sheet webhook — only for calls where the
+    # caller confirmed a site visit (site_visit_datetime in gathered_context).
+    # Same allowlist + webhook env gating as before; best-effort.
+    try:
+        await deliver_lead_for_run(workflow_run_id, transcript=transcript_text)
+    except Exception as e:
+        logger.error(f"Error delivering lead for workflow {workflow_run_id}: {e}")
 
     logger.info(f"Completed workflow completion processing for run {workflow_run_id}")

@@ -157,6 +157,55 @@ OSS_JWT_EXPIRY_HOURS = int(os.getenv("OSS_JWT_EXPIRY_HOURS", "720"))  # 30 days
 
 TUNER_BASE_URL = os.getenv("TUNER_BASE_URL", "https://api.usetuner.ai")
 
+# ---------------------------------------------------------------------------
+# Lead delivery (server-side post-call webhook)
+# ---------------------------------------------------------------------------
+# Completed voice/telephony runs have no browser to deliver a lead client-side
+# (unlike chat/WebRTC sessions, which post the lead from the visitor's page).
+# When configured, the lead_delivery service builds a structured lead from a
+# finished run's gathered_context + transcript and POSTs it to a webhook (the
+# same Google Sheet endpoint the maira-microsite uses).
+#
+# Strictly gated and OFF by default:
+#   - LEAD_DELIVERY_WEBHOOK_URL unset  -> no-op for every run.
+#   - LEAD_DELIVERY_WORKFLOW_IDS is an explicit allowlist of workflow ids that
+#     may deliver. A run whose workflow_id is not listed is a no-op. This keeps
+#     the hook from firing for arbitrary workflows/tenants.
+#   - LEAD_DELIVERY_WEBHOOK_TOKEN, when set, is appended as ?token=... on the
+#     webhook URL to satisfy the Apps Script SHEET_TOKEN shared-secret gate.
+LEAD_DELIVERY_WEBHOOK_URL = os.getenv("LEAD_DELIVERY_WEBHOOK_URL")
+LEAD_DELIVERY_WEBHOOK_TOKEN = os.getenv("LEAD_DELIVERY_WEBHOOK_TOKEN")
+# Comma-separated list of workflow ids (e.g. "11,12"). Empty/unset -> no run delivers.
+LEAD_DELIVERY_WORKFLOW_IDS = frozenset(
+    int(wid.strip())
+    for wid in os.getenv("LEAD_DELIVERY_WORKFLOW_IDS", "").split(",")
+    if wid.strip().isdigit()
+)
+
+# ---------------------------------------------------------------------------
+# Supabase CRM call logging (server-side, service-role)
+# ---------------------------------------------------------------------------
+# Every completed telephony run for an allowlisted workflow is written to the
+# shared Supabase `leads` table regardless of outcome. Only runs that include a
+# site_visit_datetime in gathered_context also fire the Google Sheet webhook.
+#
+# SUPABASE_LOG_WORKFLOW_IDS falls back to LEAD_DELIVERY_WORKFLOW_IDS when unset,
+# so a single LEAD_DELIVERY_WORKFLOW_IDS env var covers both unless you need to
+# split them.
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_LOG_CAMPAIGN = os.getenv("SUPABASE_LOG_CAMPAIGN", "maira")
+_supabase_log_ids_raw = os.getenv("SUPABASE_LOG_WORKFLOW_IDS", "").strip()
+SUPABASE_LOG_WORKFLOW_IDS: frozenset[int] = (
+    frozenset(
+        int(wid.strip())
+        for wid in _supabase_log_ids_raw.split(",")
+        if wid.strip().isdigit()
+    )
+    if _supabase_log_ids_raw
+    else LEAD_DELIVERY_WORKFLOW_IDS  # fall back to the same allowlist
+)
+
 
 # ---------------------------------------------------------------------------
 # TTS pronunciation overrides (spoken output only; never affects chat text)
@@ -183,9 +232,50 @@ def _load_json_map(env_name: str, default: dict) -> dict:
         return default
 
 
+# "sq ft" / "sq.ft" / "sqft" -> "square feet" because TTS otherwise reads the
+# abbreviation as "s-q-ft" (the LLM sometimes abbreviates even when prompted to
+# write it out). Whole-word, case-insensitive; longest key matched first.
+_SQFT_VARIANTS = {
+    "sq.ft": "square feet",
+    "sq. ft": "square feet",
+    "sq ft": "square feet",
+    "sqft": "square feet",
+    "sq feet": "square feet",
+}
 TTS_PRONUNCIATION_OVERRIDES = _load_json_map(
-    "TTS_PRONUNCIATION_OVERRIDES", {"Brigade": "Brigaid"}
+    "TTS_PRONUNCIATION_OVERRIDES", {"Brigade": "Brigaid", **_SQFT_VARIANTS}
 )
 TTS_PRONUNCIATION_OVERRIDES_INDIC = _load_json_map(
-    "TTS_PRONUNCIATION_OVERRIDES_INDIC", {"Brigade": "బ్రిగేడ్"}
+    "TTS_PRONUNCIATION_OVERRIDES_INDIC", {"Brigade": "బ్రిగేడ్", **_SQFT_VARIANTS}
+)
+
+
+def _invert_proper_noun_respellings(*maps: dict) -> dict:
+    """Build the display-restoration map (respelling -> original) for the
+    proper-noun respellings only.
+
+    The phonetic respellings (e.g. "Brigade" -> "Brigaid") must NOT appear in
+    human-visible bot text, so they are reversed for captions/transcripts. The
+    sq.ft normalizations are deliberately NOT reversed: "square feet" reads fine
+    in text and is the form we want shown.
+    """
+    restore: dict[str, str] = {}
+    for m in maps:
+        for original, respelling in m.items():
+            if original in _SQFT_VARIANTS:
+                continue
+            if respelling and respelling != original:
+                restore[respelling] = original
+    return restore
+
+
+# Reverse of the proper-noun respellings, applied to human-visible bot text
+# (live captions, transcripts, logs) so they show the real word while the
+# synthesized audio keeps the respelling. Auto-derived from the override maps
+# above; override with TTS_PRONUNCIATION_DISPLAY_RESTORE (JSON: respelling -> word).
+TTS_PRONUNCIATION_DISPLAY_RESTORE = _load_json_map(
+    "TTS_PRONUNCIATION_DISPLAY_RESTORE",
+    _invert_proper_noun_respellings(
+        TTS_PRONUNCIATION_OVERRIDES, TTS_PRONUNCIATION_OVERRIDES_INDIC
+    ),
 )
