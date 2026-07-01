@@ -88,9 +88,12 @@ class AcefoneProvider(TelephonyProvider):
 
         if workflow_run_id:
             backend_endpoint, _ = await get_backend_endpoints()
+            # Provider-scoped status-callback route (see providers/acefone/
+            # routes.py). Must match the mounted path exactly — the generic
+            # /telephony/{run}/status-callback shape has no handler (404).
             callback_url = (
                 f"{backend_endpoint}/api/v1/telephony/"
-                f"{workflow_run_id}/status-callback"
+                f"acefone/status-callback/{workflow_run_id}"
             )
             data.update({"status_callback": callback_url})
 

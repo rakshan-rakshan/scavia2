@@ -183,6 +183,18 @@ services:
       POSTHOG_API_KEY: "phc_ItizB1dP6yv7ZYobbcqrpxTdbomDA8hJFSEmAMdYvIr"
       POSTHOG_HOST: "https://us.i.posthog.com"
 
+      # Post-call lead delivery + Supabase CRM logging (server-side).
+      # OFF by default — every var unset is a no-op. Set on the deployment's
+      # .env to activate: Supabase logs every allowlisted call; the Google
+      # Sheet webhook fires only for site-visit-booked runs. See api/constants.py.
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
+      SUPABASE_LOG_CAMPAIGN: "${SUPABASE_LOG_CAMPAIGN:-maira}"
+      SUPABASE_LOG_WORKFLOW_IDS: "${SUPABASE_LOG_WORKFLOW_IDS:-}"
+      LEAD_DELIVERY_WEBHOOK_URL: "${LEAD_DELIVERY_WEBHOOK_URL:-}"
+      LEAD_DELIVERY_WEBHOOK_TOKEN: "${LEAD_DELIVERY_WEBHOOK_TOKEN:-}"
+      LEAD_DELIVERY_WORKFLOW_IDS: "${LEAD_DELIVERY_WORKFLOW_IDS:-}"
+
     ports:
       - "8000:8000"
     depends_on:

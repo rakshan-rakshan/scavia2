@@ -1,14 +1,22 @@
 """Acefone webhook and endpoint routes."""
 
+import json
 import uuid
 from typing import Any, Dict, Optional
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
+from pipecat.utils.run_context import set_current_run_id
 
 from api.db import db_client
 from api.enums import CallType, WorkflowRunMode
+from api.services.telephony.factory import get_telephony_provider_for_run
+from api.services.telephony.status_processor import (
+    StatusCallbackRequest,
+    _process_status_update,
+)
 from api.utils.common import get_backend_endpoints
 
 router = APIRouter()
@@ -23,6 +31,65 @@ async def handle_acefone_webhook(request: Request):
         data = await request.body()
     logger.info(f"Acefone webhook received: {data}")
     return {"status": "ok"}
+
+
+@router.post("/acefone/status-callback/{workflow_run_id}", include_in_schema=False)
+async def handle_acefone_status_callback(workflow_run_id: int, request: Request):
+    """Handle Acefone Click-to-Call status callbacks for an outbound run.
+
+    ``AcefoneProvider.initiate_call`` registers this URL as ``status_callback``
+    on every outbound call. Mirrors the Twilio handler: load the run, resolve
+    its provider, normalize the payload, and hand it to the shared status
+    processor (which advances run state / records cost).
+
+    Acefone is a Twilio-clone and posts form-encoded status fields, but some
+    deployments post JSON — parse the raw body defensively for either. Always
+    returns 200 so the platform does not retry-storm on a transient error.
+    """
+    set_current_run_id(workflow_run_id)
+
+    raw = await request.body()
+    callback_data: Dict[str, Any] = {}
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                callback_data = parsed
+        except Exception:
+            callback_data = dict(parse_qsl(raw.decode("utf-8", "ignore")))
+
+    logger.info(
+        f"[run {workflow_run_id}] Acefone status callback: {callback_data}"
+    )
+
+    workflow_run = await db_client.get_workflow_run_by_id(workflow_run_id)
+    if not workflow_run:
+        logger.warning(
+            f"Workflow run {workflow_run_id} not found for Acefone status callback"
+        )
+        return {"status": "ignored", "reason": "workflow_run_not_found"}
+
+    workflow = await db_client.get_workflow_by_id(workflow_run.workflow_id)
+    if not workflow:
+        logger.warning(f"Workflow {workflow_run.workflow_id} not found")
+        return {"status": "ignored", "reason": "workflow_not_found"}
+
+    provider = await get_telephony_provider_for_run(
+        workflow_run, workflow.organization_id
+    )
+    parsed_data = provider.parse_status_callback(callback_data)
+
+    status_update = StatusCallbackRequest(
+        call_id=parsed_data["call_id"],
+        status=parsed_data["status"],
+        from_number=parsed_data.get("from_number"),
+        to_number=parsed_data.get("to_number"),
+        direction=parsed_data.get("direction"),
+        duration=parsed_data.get("duration"),
+        extra=parsed_data.get("extra", {}),
+    )
+    await _process_status_update(workflow_run_id, status_update)
+    return {"status": "success"}
 
 
 def _truthy(value: Any) -> bool:

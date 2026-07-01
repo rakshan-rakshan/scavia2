@@ -9,7 +9,9 @@ from api.enums import CallType, WorkflowRunMode
 from api.services.telephony.providers.acefone.routes import (
     build_dynamic_endpoint_response,
     handle_acefone_dynamic_endpoint,
+    handle_acefone_status_callback,
 )
+from api.services.telephony.providers.acefone.provider import AcefoneProvider
 
 
 def _json_request(payload: dict, query: str = "") -> Request:
@@ -154,3 +156,72 @@ async def test_build_response_reads_query_string_fallback():
         "success": True,
         "wss_url": "wss://example.test/api/v1/telephony/ws/12/1/999",
     }
+
+
+@pytest.mark.asyncio
+async def test_status_callback_normalizes_and_processes():
+    """Outbound status callback is parsed and handed to the shared processor."""
+    db_client = patch(
+        "api.services.telephony.providers.acefone.routes.db_client"
+    ).start()
+    db_client.get_workflow_run_by_id = AsyncMock(
+        return_value=SimpleNamespace(id=999, workflow_id=11)
+    )
+    db_client.get_workflow_by_id = AsyncMock(
+        return_value=SimpleNamespace(id=11, organization_id=1)
+    )
+    # Real provider instance so we exercise the actual parse_status_callback.
+    provider = AcefoneProvider({"api_key": "k", "from_numbers": ["+911"]})
+    patch(
+        "api.services.telephony.providers.acefone.routes.get_telephony_provider_for_run",
+        new_callable=AsyncMock,
+        return_value=provider,
+    ).start()
+    process = patch(
+        "api.services.telephony.providers.acefone.routes._process_status_update",
+        new_callable=AsyncMock,
+    ).start()
+    try:
+        result = await handle_acefone_status_callback(
+            999,
+            _json_request(
+                {
+                    "CallSid": "CA-9",
+                    "CallStatus": "completed",
+                    "From": "+919999999999",
+                    "To": "+918888888888",
+                    "CallDuration": "42",
+                }
+            ),
+        )
+    finally:
+        patch.stopall()
+
+    assert result == {"status": "success"}
+    process.assert_awaited_once()
+    run_id_arg, status_arg = process.call_args.args
+    assert run_id_arg == 999
+    assert status_arg.call_id == "CA-9"
+    assert status_arg.status == "completed"
+    assert status_arg.duration == "42"
+
+
+@pytest.mark.asyncio
+async def test_status_callback_missing_run_is_ignored():
+    db_client = patch(
+        "api.services.telephony.providers.acefone.routes.db_client"
+    ).start()
+    db_client.get_workflow_run_by_id = AsyncMock(return_value=None)
+    process = patch(
+        "api.services.telephony.providers.acefone.routes._process_status_update",
+        new_callable=AsyncMock,
+    ).start()
+    try:
+        result = await handle_acefone_status_callback(
+            424242, _json_request({"CallSid": "CA-X", "CallStatus": "failed"})
+        )
+    finally:
+        patch.stopall()
+
+    assert result["status"] == "ignored"
+    process.assert_not_awaited()
